@@ -1,11 +1,12 @@
 /* ============================================================
  * Justin & Ashley · Seoul — app.js
- * Vanilla JS. Leaflet + SortableJS via CDN. localStorage persistence.
+ * Tabs (Itinerary | Map | Trip info) · Card grid w/ photos
+ * Leaflet + SortableJS via CDN · localStorage persistence
  * ============================================================ */
 
 const STORAGE_KEY = "seoul-eats-itinerary-v1";
 const DARK_KEY = "seoul-eats-dark";
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;   // bumped: adds michelin field + image_url + new Michelin backups
 
 // Type -> emoji
 const TYPE_EMOJI = {
@@ -15,38 +16,36 @@ const TYPE_EMOJI = {
 };
 const TYPE_OPTIONS = Object.keys(TYPE_EMOJI);
 
-// Reservation status -> {emoji, label}
+// Reservation status meta
 const RES_STATUS = {
-  none:   { emoji: "",   label: "No reservation needed", short: "" },
+  none:   { emoji: "🪑", label: "No reservation needed", short: "" },
   needed: { emoji: "⚠️", label: "Reservation needed",   short: "needs booking" },
   booked: { emoji: "✅", label: "Reservation booked",   short: "booked" }
 };
 const RES_OPTIONS = Object.keys(RES_STATUS);
 
 // ----------- State -----------
-let state = null;                 // { meta, days, stops, tripNotes, dayNotes, version }
+let state = null;
 let map = null;
-let markers = {};                 // id -> Leaflet marker
-let dayLayers = {};               // day -> L.LayerGroup
-let polylines = {};               // day -> polyline
+let mapInitialized = false;
+let markers = {};
+let dayLayers = {};
+let polylines = {};
 let selectedStopId = null;
 let dropPinMode = false;
-let hiddenDays = new Set();       // days currently toggled off
+let hiddenDays = new Set();
 let searchTimer = null;
+let activeTab = "stops";   // stops | map | info
+let migrationSnapshot = null;  // for the Undo button on the migration banner
 
-// ----------- Persistence -----------
+// ----------- Persistence + migration -----------
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.version === SCHEMA_VERSION && Array.isArray(parsed.stops)) {
-        return parsed;
-      } else if (parsed && parsed.stops) {
-        // Older save: try to upgrade by re-seeding meta/days but keeping stops.
-        if (confirm("Saved data is from an older version. Reset to default plan?")) {
-          return freshState();
-        }
+      if (parsed && Array.isArray(parsed.stops) && Array.isArray(parsed.days)) {
+        return migrateState(parsed);
       }
     }
   } catch (e) { console.warn("loadState failed:", e); }
@@ -61,8 +60,69 @@ function freshState() {
     days: JSON.parse(JSON.stringify(seed.days)),
     stops: JSON.parse(JSON.stringify(seed.stops)),
     tripNotes: "",
-    dayNotes: {} // day -> string
+    dayNotes: {}
   };
+}
+
+// Merge new seed stops into existing saved data without losing user edits.
+function migrateState(saved) {
+  const seed = window.SEED_ITINERARY;
+  const next = JSON.parse(JSON.stringify(saved));
+  const savedVersion = next.version || 1;
+
+  // Patch michelin field, image_url, unavailable, reservation_url onto existing stops
+  // when the seed knows them but the saved copy doesn't (these are non-destructive
+  // upgrades — they only fill in missing fields).
+  const patched = [];
+  for (const seedStop of seed.stops) {
+    const existing = next.stops.find(s => s.id === seedStop.id);
+    if (existing) {
+      let didPatch = false;
+      if (seedStop.michelin && !existing.michelin) { existing.michelin = seedStop.michelin; didPatch = true; }
+      if (seedStop.image_url && !existing.image_url) { existing.image_url = seedStop.image_url; didPatch = true; }
+      if (seedStop.reservation_url && !existing.reservation_url) {
+        existing.reservation_url = seedStop.reservation_url; didPatch = true;
+      }
+      if (seedStop.unavailable && existing.unavailable === undefined) {
+        existing.unavailable = seedStop.unavailable; didPatch = true;
+      }
+      if (didPatch) patched.push(seedStop.id);
+    }
+  }
+
+  // Add new seed stops that don't exist yet (by id).
+  const existingIds = new Set(next.stops.map(s => s.id));
+  const added = [];
+  const addedMichelin = [];
+  for (const seedStop of seed.stops) {
+    if (!existingIds.has(seedStop.id)) {
+      next.stops.push(JSON.parse(JSON.stringify(seedStop)));
+      added.push(seedStop.id);
+      if (seedStop.michelin) addedMichelin.push(seedStop.id);
+    }
+  }
+
+  // Merge any seed days that aren't in saved data (so newly-added scheduled
+  // stops always have a day group to render in).
+  const existingDayNums = new Set(next.days.map(d => d.day));
+  for (const seedDay of seed.days) {
+    if (!existingDayNums.has(seedDay.day)) {
+      next.days.push(JSON.parse(JSON.stringify(seedDay)));
+    }
+  }
+
+  next.version = SCHEMA_VERSION;
+
+  if (added.length || patched.length) {
+    migrationSnapshot = {
+      prev: saved,
+      addedIds: added,
+      addedMichelinIds: addedMichelin,
+      patchedIds: patched
+    };
+  }
+
+  return next;
 }
 
 let saveTimer = null;
@@ -95,37 +155,20 @@ function haversineKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
 }
 function walkMin(km) { return Math.round(km * 12); }
+function stars(n) { return "★".repeat(n || 0); }
 
-function renderReservationBlock(s) {
-  const status = s.reservation_status || "none";
-  const info = RES_STATUS[status];
-  const url = s.reservation_url || "";
-  // Style the block based on status
-  const bg = status === "booked" ? "rgba(47,158,68,0.10)"
-           : status === "needed" ? "rgba(232,89,12,0.10)"
-           : "var(--bg-elev)";
-  const border = status === "booked" ? "rgba(47,158,68,0.45)"
-               : status === "needed" ? "rgba(232,89,12,0.45)"
-               : "var(--border)";
-  const reserveBtn = url
-    ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="primary" style="padding:8px 12px;border-radius:8px;text-decoration:none;background:var(--accent);color:white;font-weight:600;font-size:13px;">🔗 Reserve</a>`
-    : "";
-  const statusBtn = `<button id="res-toggle" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg-elev);color:var(--fg);font-size:13px;font-weight:600;">
-      ${info.emoji || "🪑"} ${status === "none" ? "Mark as needed" : (status === "needed" ? "Mark booked" : "Booked — undo")}
-    </button>`;
-  return `
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin-bottom:10px;
-                background:${bg};border:1px solid ${border};border-radius:10px;">
-      <div style="flex:1;min-width:120px;font-size:13px;">
-        <strong>${info.emoji || "🪑"} Reservation:</strong> ${escapeHtml(info.label)}
-      </div>
-      ${reserveBtn}
-      ${statusBtn}
-    </div>
-  `;
+function lighten(hex, amount = 0.5) {
+  const m = /^#?([a-f\d]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const v = parseInt(m[1], 16);
+  let r = (v >> 16) & 0xff, g = (v >> 8) & 0xff, b = v & 0xff;
+  r = Math.round(r + (255 - r) * amount);
+  g = Math.round(g + (255 - g) * amount);
+  b = Math.round(b + (255 - b) * amount);
+  return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
 }
 
-function toast(msg, ms = 2200) {
+function toast(msg, ms = 2400) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.remove("hidden");
@@ -133,18 +176,23 @@ function toast(msg, ms = 2200) {
   toast._t = setTimeout(() => el.classList.add("hidden"), ms);
 }
 
-// ----------- Map setup -----------
-function setupMap() {
-  map = L.map("map", { zoomControl: true }).setView(state.meta.center, state.meta.zoom);
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function escapeAttr(s) { return escapeHtml(s); }
 
+// ----------- Map -----------
+function setupMap() {
+  if (mapInitialized) return;
+  map = L.map("map", { zoomControl: true }).setView(state.meta.center, state.meta.zoom);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
-
-  map.on("click", (e) => {
-    if (dropPinMode) finishDropPin(e.latlng);
-  });
+  map.on("click", (e) => { if (dropPinMode) finishDropPin(e.latlng); });
+  mapInitialized = true;
 }
 
 function makePinIcon(color, emoji, orderBadge) {
@@ -155,14 +203,14 @@ function makePinIcon(color, emoji, orderBadge) {
              <span class="pin-emoji">${emoji}</span>
              ${orderHtml}
            </div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
     popupAnchor: [0, -28]
   });
 }
 
 function rebuildMarkers() {
-  // Clear
+  if (!map) return;
   Object.values(markers).forEach(m => map.removeLayer(m));
   markers = {};
   Object.values(dayLayers).forEach(g => map.removeLayer(g));
@@ -184,7 +232,7 @@ function rebuildMarkers() {
       draggable: true,
       title: s.name
     });
-    marker.on("click", () => selectStop(s.id));
+    marker.on("click", () => { selectStop(s.id); });
     marker.on("dragend", (e) => {
       const ll = e.target.getLatLng();
       s.lat = ll.lat; s.lng = ll.lng;
@@ -196,14 +244,13 @@ function rebuildMarkers() {
     marker.addTo(dayLayers[s.day]);
   });
 
-  // Polylines per scheduled day
   state.days.forEach(d => { if (d.day !== 0) drawDayPolyline(d.day); });
 }
 
 function drawDayPolyline(day) {
+  if (!map) return;
   if (polylines[day]) { map.removeLayer(polylines[day]); delete polylines[day]; }
-  if (hiddenDays.has(day)) return;
-  if (day === 0) return;
+  if (hiddenDays.has(day) || day === 0) return;
   const pts = stopsForDay(day).map(s => [s.lat, s.lng]);
   if (pts.length < 2) return;
   const color = dayMeta(day).color;
@@ -211,12 +258,12 @@ function drawDayPolyline(day) {
 }
 
 function fitTo(stops) {
-  if (!stops || !stops.length) return;
+  if (!map || !stops || !stops.length) return;
   const bounds = L.latLngBounds(stops.map(s => [s.lat, s.lng]));
   map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
 }
 
-// ----------- Render: sidebar -----------
+// ----------- Legend -----------
 function renderLegend() {
   const el = document.getElementById("legend");
   el.innerHTML = "";
@@ -226,7 +273,7 @@ function renderLegend() {
     label.innerHTML = `
       <input type="checkbox" id="${id}" ${hiddenDays.has(d.day) ? "" : "checked"} />
       <span class="swatch" style="background:${d.color}"></span>
-      <span>${d.day === 0 ? "Ideas" : "D" + d.day}</span>
+      <span>${d.day === 0 ? "Ideas" : "Day " + d.day}</span>
     `;
     label.querySelector("input").addEventListener("change", (e) => {
       if (e.target.checked) hiddenDays.delete(d.day); else hiddenDays.add(d.day);
@@ -240,141 +287,221 @@ function applyDayVisibility(day) {
   if (hiddenDays.has(day)) {
     if (dayLayers[day]) map.removeLayer(dayLayers[day]);
     if (polylines[day]) { map.removeLayer(polylines[day]); delete polylines[day]; }
-    const group = document.querySelector(`.day-group[data-day="${day}"]`);
-    if (group) group.classList.add("collapsed");
+    document.querySelectorAll(`.day-group[data-day="${day}"]`).forEach(el => el.classList.add("collapsed"));
   } else {
     if (dayLayers[day]) dayLayers[day].addTo(map);
     drawDayPolyline(day);
-    const group = document.querySelector(`.day-group[data-day="${day}"]`);
-    if (group) group.classList.remove("collapsed");
+    document.querySelectorAll(`.day-group[data-day="${day}"]`).forEach(el => el.classList.remove("collapsed"));
   }
 }
 
+// ----------- Card grid -----------
 function renderDayList() {
   const root = document.getElementById("day-list");
   root.innerHTML = "";
   state.days.forEach(d => {
-    const stops = stopsForDay(d.day);
-    const group = document.createElement("section");
-    group.className = "day-group";
-    group.dataset.day = d.day;
-    if (hiddenDays.has(d.day)) group.classList.add("collapsed");
-
-    const subtotal = stops.reduce((sum, s) => sum + (Number(s.cost_krw) || 0), 0);
-
-    const head = document.createElement("div");
-    head.className = "day-head";
-    head.innerHTML = `
-      <span class="day-bar" style="background:${d.color}"></span>
-      <div style="flex:1;min-width:0;">
-        <div class="day-title">${escapeHtml(d.title)}</div>
-        <div class="day-sub">${d.date ? d.weekday + " · " + d.date : "Unscheduled tray"} · ${stops.length} stop${stops.length === 1 ? "" : "s"}</div>
-      </div>
-      <div class="day-cost">${subtotal ? fmtKRW(subtotal) : ""}</div>
-    `;
-    head.addEventListener("click", () => {
-      if (hiddenDays.has(d.day)) hiddenDays.delete(d.day); else hiddenDays.add(d.day);
-      applyDayVisibility(d.day);
-      const cb = document.getElementById("lg-" + d.day);
-      if (cb) cb.checked = !hiddenDays.has(d.day);
-    });
-    group.appendChild(head);
-
-    const list = document.createElement("ul");
-    list.className = "stop-list";
-    list.dataset.day = d.day;
-
-    stops.forEach((s, idx) => {
-      const nextStop = stops[idx + 1];
-      const li = document.createElement("li");
-      li.className = "stop-row";
-      li.dataset.id = s.id;
-      if (s.id === selectedStopId) li.classList.add("active");
-      if (s.done) li.classList.add("done");
-
-      const distMeta = nextStop ? (() => {
-        const km = haversineKm(s, nextStop);
-        const min = walkMin(km);
-        const subway = km > 1.5 ? " (subway faster)" : "";
-        return `→ ${km.toFixed(1)} km · ~${min} min walk${subway}`;
-      })() : "";
-
-      const resBadge = s.reservation_status && s.reservation_status !== "none"
-        ? `<span title="${RES_STATUS[s.reservation_status].label}" style="margin-right:4px;">${RES_STATUS[s.reservation_status].emoji}</span>`
-        : "";
-      li.innerHTML = `
-        <div class="order-badge" style="background:${d.color}">${d.day === 0 ? "💡" : s.order}</div>
-        <div class="emoji">${TYPE_EMOJI[s.type] || TYPE_EMOJI.other}</div>
-        <div class="midcol">
-          <div class="name">${resBadge}${escapeHtml(s.name)}</div>
-          <div class="meta">${s.time ? s.time + " · " : ""}${escapeHtml(s.area || "")}${distMeta ? " · " + distMeta : ""}</div>
-        </div>
-        <div class="right">
-          <div>${s.cost_krw ? fmtKRW(s.cost_krw) : ""}</div>
-          <button class="edit-btn" title="Edit" aria-label="Edit">✏️</button>
-        </div>
-      `;
-      li.addEventListener("click", (e) => {
-        if (e.target.closest(".edit-btn")) {
-          openEditForm(s.id);
-        } else {
-          selectStop(s.id);
-        }
-      });
-      list.appendChild(li);
-    });
-
-    if (!stops.length) {
-      const empty = document.createElement("li");
-      empty.className = "stop-row";
-      empty.style.opacity = "0.55";
-      empty.innerHTML = `<div></div><div class="emoji">·</div><div class="midcol"><div class="meta">Drag a stop here or use + Add place.</div></div><div></div>`;
-      list.appendChild(empty);
-    }
-
-    group.appendChild(list);
-
-    // Day notes + per-day fit
-    const foot = document.createElement("div");
-    foot.className = "day-foot";
-    const noteVal = (state.dayNotes && state.dayNotes[d.day]) || "";
-    foot.innerHTML = `
-      <textarea placeholder="Notes for ${d.day === 0 ? "ideas" : "day " + d.day}…">${escapeHtml(noteVal)}</textarea>
-      <button class="iconbtn" data-fit="${d.day}" title="Fit map to this day">🎯</button>
-    `;
-    foot.querySelector("textarea").addEventListener("input", (e) => {
-      state.dayNotes[d.day] = e.target.value;
-      saveState();
-    });
-    foot.querySelector("button").addEventListener("click", () => {
-      const ss = stopsForDay(d.day);
-      if (!ss.length) return;
-      if (hiddenDays.has(d.day)) {
-        hiddenDays.delete(d.day);
-        applyDayVisibility(d.day);
-        const cb = document.getElementById("lg-" + d.day);
-        if (cb) cb.checked = true;
-      }
-      fitTo(ss);
-    });
-    group.appendChild(foot);
-
+    const group = buildDayGroup(d);
     root.appendChild(group);
-
-    // Sortable per list
-    if (window.Sortable) {
-      new Sortable(list, {
-        group: "stops",
-        animation: 140,
-        delay: 120,
-        delayOnTouchOnly: true,
-        touchStartThreshold: 5,
-        ghostClass: "sortable-ghost",
-        chosenClass: "sortable-chosen",
-        onEnd: handleSortEnd
-      });
-    }
   });
+}
+
+function buildDayGroup(d) {
+  const group = document.createElement("section");
+  group.className = "day-group";
+  group.dataset.day = d.day;
+  group.style.setProperty("--day-color", d.color);
+  if (hiddenDays.has(d.day)) group.classList.add("collapsed");
+
+  const stops = stopsForDay(d.day);
+  const subtotal = stops.reduce((sum, s) => sum + (Number(s.cost_krw) || 0), 0);
+
+  const head = document.createElement("div");
+  head.className = "day-head";
+  head.innerHTML = `
+    <div class="day-number">${d.day === 0 ? "💡" : d.day}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="day-title">${escapeHtml(d.title)}</div>
+      <div class="day-sub">${d.date ? d.weekday + " · " + d.date : "Unscheduled tray"} · ${stops.length} stop${stops.length === 1 ? "" : "s"}</div>
+    </div>
+    <div class="day-cost">${subtotal ? fmtKRW(subtotal) : ""}</div>
+  `;
+  head.addEventListener("click", () => {
+    if (hiddenDays.has(d.day)) hiddenDays.delete(d.day); else hiddenDays.add(d.day);
+    applyDayVisibility(d.day);
+    const cb = document.getElementById("lg-" + d.day);
+    if (cb) cb.checked = !hiddenDays.has(d.day);
+  });
+  group.appendChild(head);
+
+  // Day 0 is special: split into Michelin subsection + regular ideas.
+  if (d.day === 0) {
+    const michelin = stops.filter(s => s.michelin)
+      .sort((a, b) => (b.michelin || 0) - (a.michelin || 0));
+    const others = stops.filter(s => !s.michelin);
+
+    if (michelin.length) {
+      const sh = document.createElement("div");
+      sh.className = "subsection-head";
+      sh.textContent = "⭐ Michelin stars — Mingles backups";
+      group.appendChild(sh);
+      group.appendChild(buildStopList(d, michelin, "michelin"));
+    }
+    const otherHead = document.createElement("div");
+    otherHead.className = "subsection-head";
+    otherHead.textContent = "Other ideas";
+    group.appendChild(otherHead);
+    group.appendChild(buildStopList(d, others, "other"));
+  } else {
+    group.appendChild(buildStopList(d, stops, "scheduled"));
+  }
+
+  // Day notes
+  const noteVal = (state.dayNotes && state.dayNotes[d.day]) || "";
+  const foot = document.createElement("div");
+  foot.className = "day-foot";
+  foot.innerHTML = `
+    <textarea placeholder="Notes for ${d.day === 0 ? "ideas" : "day " + d.day}…">${escapeHtml(noteVal)}</textarea>
+  `;
+  foot.querySelector("textarea").addEventListener("input", (e) => {
+    state.dayNotes[d.day] = e.target.value; saveState();
+  });
+  group.appendChild(foot);
+
+  return group;
+}
+
+function buildStopList(d, stops, subkind) {
+  const ul = document.createElement("ul");
+  ul.className = "stop-list";
+  ul.dataset.day = d.day;
+  ul.dataset.subkind = subkind;
+  if (!stops.length) {
+    ul.classList.add("empty-tray");
+    ul.innerHTML = `<div>Drag a stop here, or use + Add place.</div>`;
+    return ul;
+  }
+  stops.forEach((s, idx) => {
+    ul.appendChild(buildStopCard(s, d, idx, stops));
+  });
+  if (window.Sortable) {
+    new Sortable(ul, {
+      group: "stops",
+      animation: 160,
+      delay: 140,
+      delayOnTouchOnly: true,
+      touchStartThreshold: 6,
+      ghostClass: "sortable-ghost",
+      chosenClass: "sortable-chosen",
+      filter: ".unavailable",
+      preventOnFilter: false,
+      onMove: (evt) => !evt.dragged.classList.contains("unavailable"),
+      onEnd: handleSortEnd
+    });
+  }
+  return ul;
+}
+
+function buildStopCard(s, d, idx, stopsInDay) {
+  const li = document.createElement("li");
+  li.className = "stop-card";
+  li.dataset.id = s.id;
+  if (s.id === selectedStopId) li.classList.add("active");
+  if (s.done) li.classList.add("done");
+  if (s.unavailable) li.classList.add("unavailable");
+
+  // Color seeds for gradient fallback (in case image_url fails)
+  li.style.setProperty("--card-color", d.color);
+  li.style.setProperty("--card-color-dark", lighten(d.color, -0.2) || d.color);
+
+  const emoji = TYPE_EMOJI[s.type] || TYPE_EMOJI.other;
+  const dayLabel = d.day === 0 ? "💡 Idea" : `Day ${d.day}`;
+  const orderBadge = d.day === 0 ? "" : `<span class="order-num" style="color:${d.color}">${s.order}</span>`;
+  const starPill = s.michelin
+    ? `<span class="stars-pill">${stars(s.michelin)} Michelin</span>`
+    : "";
+  const resStatus = s.reservation_status || "none";
+  const resInfo = RES_STATUS[resStatus];
+  const resPill = resStatus !== "none"
+    ? `<span class="res-pill ${resStatus}">${resInfo.emoji} ${resInfo.short}</span>`
+    : "";
+
+  // Hero with image + fallback
+  const heroImg = s.image_url
+    ? `<img src="${escapeAttr(s.image_url)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" />
+       <div class="hero-emoji" style="display:none;background:linear-gradient(135deg, ${d.color}, ${lighten(d.color, -0.25) || d.color});">${emoji}</div>`
+    : `<div class="hero-emoji" style="background:linear-gradient(135deg, ${d.color}, ${lighten(d.color, -0.25) || d.color});">${emoji}</div>`;
+
+  // Reservation button on the card
+  let bookBtn = "";
+  if (s.reservation_url) {
+    const isBooked = resStatus === "booked";
+    bookBtn = `<a href="${escapeAttr(s.reservation_url)}" target="_blank" rel="noopener" class="book-btn ${isBooked ? "booked" : ""}" data-no-open="1">
+                 ${isBooked ? "✅ Booked" : "🔗 Book"}
+               </a>`;
+  }
+
+  // Distance to next stop in same day (scheduled only)
+  let distMeta = "";
+  if (d.day !== 0 && stopsInDay[idx + 1]) {
+    const nextStop = stopsInDay[idx + 1];
+    const km = haversineKm(s, nextStop);
+    const min = walkMin(km);
+    distMeta = `<span class="dot">·</span><span>→ ${km.toFixed(1)} km / ${min} min</span>`;
+  }
+
+  li.innerHTML = `
+    <div class="card-hero">
+      ${heroImg}
+      <div class="hero-tags">
+        <span class="day-pill" style="background:${d.color};color:white;">
+          ${orderBadge} ${dayLabel}${s.time ? " · " + s.time : ""}
+        </span>
+        ${starPill || resPill}
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-name">
+        <span style="font-size:18px;">${emoji}</span>
+        <span>${escapeHtml(s.name)}</span>
+      </div>
+      ${s.name_ko ? `<div class="card-name-ko">${escapeHtml(s.name_ko)}</div>` : ""}
+      <div class="card-meta">
+        ${s.area ? `<span>📍 ${escapeHtml(s.area)}</span>` : ""}
+        ${s.cost_krw ? `<span class="card-cost">${fmtKRW(s.cost_krw)}</span>` : ""}
+        ${distMeta}
+      </div>
+      ${s.blurb ? `<div class="card-blurb">${escapeHtml(s.blurb)}</div>` : ""}
+      <div class="card-actions">
+        ${bookBtn}
+        ${s.name_ko ? `<button class="copy-ko-btn" data-no-open="1" title="Copy Korean name">📋 한국어</button>` : ""}
+        <button class="edit-btn" data-no-open="1" title="Edit" aria-label="Edit">✏️</button>
+      </div>
+    </div>
+  `;
+
+  li.addEventListener("click", (e) => {
+    const target = e.target.closest("[data-no-open]");
+    if (target) {
+      e.stopPropagation();
+      if (target.classList.contains("edit-btn")) {
+        openEditForm(s.id);
+      } else if (target.classList.contains("copy-ko-btn")) {
+        copyKorean(s);
+      }
+      // book-btn is an <a>, its default click navigates — let it through.
+      return;
+    }
+    selectStop(s.id);
+  });
+  return li;
+}
+
+function copyKorean(s) {
+  const text = s.name_ko || s.name;
+  navigator.clipboard.writeText(text).then(
+    () => toast("Copied: " + text),
+    () => toast("Couldn't copy.")
+  );
 }
 
 function handleSortEnd(evt) {
@@ -384,9 +511,14 @@ function handleSortEnd(evt) {
   const stop = state.stops.find(s => s.id === id);
   if (!stop) return;
   stop.day = toDay;
-  // Recompute order from current DOM in both lists
-  reorderFromDom(toDay);
-  if (fromDay !== toDay) reorderFromDom(fromDay);
+  // Recompute orders for both lists. For day 0 we just re-pack from state since
+  // ordering across the two sublists isn't meaningful.
+  if (toDay === 0) reorderDayInState(0);
+  else reorderFromDom(toDay);
+  if (fromDay !== toDay) {
+    if (fromDay === 0) reorderDayInState(0);
+    else reorderFromDom(fromDay);
+  }
   saveState();
   renderAll();
 }
@@ -394,13 +526,19 @@ function handleSortEnd(evt) {
 function reorderFromDom(day) {
   const list = document.querySelector(`.stop-list[data-day="${day}"]`);
   if (!list) return;
-  const ids = [...list.querySelectorAll(".stop-row")].map(li => li.dataset.id).filter(Boolean);
+  const ids = [...list.querySelectorAll(".stop-card")].map(li => li.dataset.id).filter(Boolean);
   ids.forEach((id, idx) => {
     const s = state.stops.find(x => x.id === id);
     if (s) s.order = idx + 1;
   });
 }
 
+function reorderDayInState(day) {
+  const ss = state.stops.filter(s => s.day === day).sort((a, b) => a.order - b.order);
+  ss.forEach((s, i) => s.order = i + 1);
+}
+
+// ----------- Totals -----------
 function renderTotals() {
   const total = state.stops
     .filter(s => s.day !== 0)
@@ -408,29 +546,32 @@ function renderTotals() {
   const ideasTotal = state.stops
     .filter(s => s.day === 0)
     .reduce((sum, s) => sum + (Number(s.cost_krw) || 0), 0);
-  const needBooking = state.stops.filter(s => s.reservation_status === "needed").length;
+  const needBooking = state.stops.filter(s => s.reservation_status === "needed" && !s.unavailable).length;
   const booked = state.stops.filter(s => s.reservation_status === "booked").length;
+  const visited = state.stops.filter(s => s.done).length;
   const el = document.getElementById("totals");
   el.innerHTML = `
     <div>
-      <div style="font-size:11px;color:var(--fg-soft);">Scheduled total</div>
+      <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Scheduled total</div>
       <div class="trip-total">${fmtKRW(total)}</div>
-      ${needBooking ? `<div style="font-size:11px;color:var(--accent);margin-top:4px;">⚠️ ${needBooking} still need${needBooking === 1 ? "s" : ""} booking</div>` : ""}
-      ${booked ? `<div style="font-size:11px;color:#2F9E44;margin-top:2px;">✅ ${booked} booked</div>` : ""}
+      ${needBooking ? `<div style="font-size:12px;color:var(--persimmon);margin-top:4px;">⚠️ ${needBooking} still need${needBooking === 1 ? "s" : ""} booking</div>` : ""}
+      ${booked ? `<div style="font-size:12px;color:var(--jade);margin-top:2px;">✅ ${booked} booked</div>` : ""}
+      ${visited ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">🍽 ${visited} visited</div>` : ""}
     </div>
-    <div style="text-align:right;font-size:11px;color:var(--fg-soft);">
+    <div style="text-align:right;font-size:11px;color:var(--ink-soft);">
       <div>${state.stops.filter(s=>s.day!==0).length} scheduled · ${state.stops.filter(s=>s.day===0).length} ideas</div>
-      <div>Ideas pool: ${fmtKRW(ideasTotal)}</div>
+      <div style="margin-top:2px;">Ideas pool: ${fmtKRW(ideasTotal)}</div>
     </div>
   `;
 }
 
+// ----------- Render all -----------
 function renderAll() {
   renderLegend();
   renderDayList();
   renderTotals();
   rebuildMarkers();
-  document.getElementById("title").textContent = state.meta.title;
+  document.getElementById("title").innerHTML = state.meta.title.replace(/&/g, '<span class="amp">&amp;</span>');
   document.getElementById("subtitle").textContent = state.meta.subtitle;
   document.getElementById("trip-notes").value = state.tripNotes || "";
 }
@@ -438,24 +579,16 @@ function renderAll() {
 // ----------- Select / detail -----------
 function selectStop(id) {
   selectedStopId = id;
-  document.querySelectorAll(".stop-row").forEach(r => r.classList.toggle("active", r.dataset.id === id));
+  document.querySelectorAll(".stop-card").forEach(c => c.classList.toggle("active", c.dataset.id === id));
   const s = state.stops.find(x => x.id === id);
   if (!s) return;
-  const m = markers[id];
-  // Make sure its day layer is visible
+  // Make sure its day is visible
   if (hiddenDays.has(s.day)) {
     hiddenDays.delete(s.day);
     applyDayVisibility(s.day);
     const cb = document.getElementById("lg-" + s.day);
     if (cb) cb.checked = true;
   }
-  if (m) {
-    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15), { animate: true });
-    m.openPopup && m.openPopup();
-  }
-  // Scroll row into view
-  const row = document.querySelector(`.stop-row[data-id="${id}"]`);
-  if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
   openDetailSheet(id);
 }
 
@@ -470,98 +603,116 @@ function openDetailSheet(id) {
     : "https://www.google.com/maps/search/?api=1&query=" + s.lat + "," + s.lng;
   const directionsUrl = "https://www.google.com/maps/dir/?api=1&destination=" + s.lat + "," + s.lng + "&travelmode=transit";
 
+  const emoji = TYPE_EMOJI[s.type] || TYPE_EMOJI.other;
+  const resStatus = s.reservation_status || "none";
+  const resInfo = RES_STATUS[resStatus];
+
+  const heroBg = `linear-gradient(135deg, ${meta.color}, ${lighten(meta.color, -0.25) || meta.color})`;
+  const heroImg = s.image_url
+    ? `<img src="${escapeAttr(s.image_url)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" /><div class="hero-emoji-big" style="display:none;background:${heroBg};">${emoji}</div>`
+    : `<div class="hero-emoji-big" style="background:${heroBg};">${emoji}</div>`;
+
   const sheet = document.getElementById("sheet-content");
+
+  const resBlock = `
+    <div class="detail-reservation ${resStatus}">
+      <div class="res-label">
+        <strong>${resInfo.emoji} ${escapeHtml(resInfo.label)}</strong>
+        ${s.unavailable ? `<div style="font-size:12px;color:var(--persimmon);margin-top:2px;">Currently booked — pick a backup below.</div>` : ""}
+      </div>
+      ${s.reservation_url ? `<a href="${escapeAttr(s.reservation_url)}" target="_blank" rel="noopener" class="book-link">${resStatus === "booked" ? "✅ Booked" : "🔗 Book now"}</a>` : ""}
+      <button id="res-toggle">${resStatus === "none" ? "Mark needed" : (resStatus === "needed" ? "Mark booked" : "Undo booked")}</button>
+    </div>
+  `;
+
+  const starsLine = s.michelin
+    ? `<div style="color:var(--gold);font-weight:600;font-size:14px;margin-top:4px;">${stars(s.michelin)} Michelin Guide ${s.michelin === 1 ? "(1 star)" : `(${s.michelin} stars)`}</div>`
+    : "";
+
   sheet.innerHTML = `
+    <div class="detail-hero">${heroImg}</div>
     <div class="detail-head">
-      <div class="detail-emoji" style="background:${meta.color}">${TYPE_EMOJI[s.type] || TYPE_EMOJI.other}</div>
       <div style="flex:1;min-width:0;">
         <div class="detail-name">${escapeHtml(s.name)}</div>
         ${s.name_ko ? `<div class="detail-name-ko">${escapeHtml(s.name_ko)}</div>` : ""}
+        ${starsLine}
         <div class="detail-meta">
-          ${s.day === 0 ? "💡 Ideas tray" : "Day " + s.day + (meta.date ? " · " + meta.weekday + " " + meta.date : "")}
-          ${s.time ? " · " + s.time : ""}
-          ${s.area ? " · " + escapeHtml(s.area) : ""}
-          ${s.cost_krw ? " · " + fmtKRW(s.cost_krw) : ""}
+          ${s.day === 0 ? "💡 Idea" : `Day ${s.day} · ${meta.weekday} ${meta.date}`}
+          ${s.time ? ` · ${s.time}` : ""}
+          ${s.area ? ` · ${escapeHtml(s.area)}` : ""}
+          ${s.cost_krw ? ` · ${fmtKRW(s.cost_krw)}` : ""}
+          ${s.hours ? ` · 🕒 ${escapeHtml(s.hours)}` : ""}
         </div>
       </div>
       <button class="iconbtn" id="sheet-close" aria-label="Close">✕</button>
     </div>
+
+    ${resBlock}
+
     ${s.blurb ? `<div class="detail-blurb">${escapeHtml(s.blurb)}</div>` : ""}
-    ${s.hours ? `<div class="detail-meta" style="margin-bottom:6px;">🕒 ${escapeHtml(s.hours)}</div>` : ""}
-    ${renderReservationBlock(s)}
+
     <div class="detail-quicklinks">
-      <a href="${naverUrl}" target="_blank" rel="noopener" class="primary">Naver</a>
-      <a href="${kakaoUrl}" target="_blank" rel="noopener">Kakao</a>
+      <a href="${naverUrl}" target="_blank" rel="noopener" class="primary">🗺 Naver Map</a>
+      <a href="${kakaoUrl}" target="_blank" rel="noopener">KakaoMap</a>
       <a href="${googleUrl}" target="_blank" rel="noopener">Google</a>
-      <a href="${directionsUrl}" target="_blank" rel="noopener">Directions</a>
+      <a href="${directionsUrl}" target="_blank" rel="noopener">🚇 Directions</a>
       <button id="copy-ko">📋 Copy 한국어</button>
     </div>
+
     <div class="detail-stop-notes">
-      <textarea id="stop-notes" placeholder="Stop notes (hours, who to ask for, what to order)…">${escapeHtml(s.notes || "")}</textarea>
+      <textarea id="stop-notes" placeholder="Stop notes (what to order, hours, who to ask for)…">${escapeHtml(s.notes || "")}</textarea>
     </div>
+
     <div class="detail-actions">
       <button id="btn-done" class="${s.done ? "primary" : ""}">${s.done ? "✅ Visited" : "Mark visited"}</button>
       <button id="btn-edit" class="primary">✏️ Edit</button>
       <button id="btn-delete" class="danger">🗑 Delete</button>
     </div>
   `;
-  sheet.querySelector("#sheet-close").addEventListener("click", closeSheet);
-  // Reservation interactions
-  const resToggle = sheet.querySelector("#res-toggle");
-  if (resToggle) {
-    resToggle.addEventListener("click", () => {
-      // Cycle: needed -> booked -> needed (or none -> needed -> booked -> none)
-      const cur = s.reservation_status || "none";
-      const next = cur === "none" ? "needed" : (cur === "needed" ? "booked" : "none");
-      s.reservation_status = next;
-      saveState();
-      renderDayList();
-      openDetailSheet(id);
-      toast("Status: " + RES_STATUS[next].label);
-    });
-  }
 
-  sheet.querySelector("#copy-ko").addEventListener("click", () => {
-    navigator.clipboard.writeText(s.name_ko || s.name).then(
-      () => toast("Korean name copied — show your driver."),
-      () => toast("Copy failed.")
-    );
-  });
-  sheet.querySelector("#stop-notes").addEventListener("input", (e) => {
-    s.notes = e.target.value; saveState();
+  sheet.querySelector("#sheet-close").addEventListener("click", closeSheet);
+  sheet.querySelector("#copy-ko").addEventListener("click", () => copyKorean(s));
+  sheet.querySelector("#stop-notes").addEventListener("input", (e) => { s.notes = e.target.value; saveState(); });
+  sheet.querySelector("#res-toggle").addEventListener("click", () => {
+    const cur = s.reservation_status || "none";
+    const next = cur === "none" ? "needed" : (cur === "needed" ? "booked" : "none");
+    s.reservation_status = next;
+    saveState();
+    renderDayList();
+    openDetailSheet(id);
+    toast("Status: " + RES_STATUS[next].label);
   });
   sheet.querySelector("#btn-done").addEventListener("click", () => {
-    s.done = !s.done; saveState(); renderDayList(); openDetailSheet(id);
+    s.done = !s.done; saveState(); renderDayList(); renderTotals(); openDetailSheet(id);
   });
   sheet.querySelector("#btn-edit").addEventListener("click", () => openEditForm(id));
   sheet.querySelector("#btn-delete").addEventListener("click", () => {
     if (!confirm(`Delete “${s.name}”?`)) return;
     state.stops = state.stops.filter(x => x.id !== id);
     selectedStopId = null;
-    saveState();
-    renderAll();
-    closeSheet();
+    saveState(); renderAll(); closeSheet();
     toast("Deleted.");
   });
 
   showSheet();
 }
 
+// ----------- Edit form -----------
 function openEditForm(id, options = {}) {
   const isNew = options.isNew === true;
   const s = isNew ? options.stop : state.stops.find(x => x.id === id);
   if (!s) return;
 
   const dayOpts = state.days
-    .slice()
-    .sort((a, b) => a.day - b.day)
+    .slice().sort((a, b) => a.day - b.day)
     .map(d => `<option value="${d.day}" ${d.day === s.day ? "selected" : ""}>${d.day === 0 ? "Ideas (unscheduled)" : "Day " + d.day + " — " + d.title}</option>`)
     .join("");
   const typeOpts = TYPE_OPTIONS.map(t => `<option value="${t}" ${t === s.type ? "selected" : ""}>${TYPE_EMOJI[t]} ${t}</option>`).join("");
+  const resOpts = RES_OPTIONS.map(k => `<option value="${k}" ${(s.reservation_status || "none") === k ? "selected" : ""}>${RES_STATUS[k].emoji} ${RES_STATUS[k].label}</option>`).join("");
 
   const sheet = document.getElementById("sheet-content");
   sheet.innerHTML = `
-    <h3 style="margin-bottom:10px;">${isNew ? "Add a stop" : "Edit stop"}</h3>
+    <h3 style="font-family:'Fraunces',serif;font-size:22px;font-weight:500;margin-bottom:14px;">${isNew ? "Add a stop" : "Edit stop"}</h3>
     <div class="form-row">
       <label>Name</label>
       <input id="f-name" type="text" value="${escapeAttr(s.name || "")}" />
@@ -595,19 +746,34 @@ function openEditForm(id, options = {}) {
       <input id="f-area" type="text" value="${escapeAttr(s.area || "")}" />
     </div>
     <div class="form-row">
+      <label>Photo URL (paste any image link)</label>
+      <input id="f-image" type="url" value="${escapeAttr(s.image_url || "")}" placeholder="https://..." />
+    </div>
+    <div class="form-row">
       <label>Hours (optional)</label>
       <input id="f-hours" type="text" value="${escapeAttr(s.hours || "")}" placeholder="e.g. 11:00–22:00, closed Sun" />
     </div>
     <div class="form-grid2">
       <div class="form-row">
         <label>Reservation status</label>
-        <select id="f-res-status">
-          ${RES_OPTIONS.map(k => `<option value="${k}" ${(s.reservation_status || "none") === k ? "selected" : ""}>${RES_STATUS[k].emoji} ${RES_STATUS[k].label}</option>`).join("")}
-        </select>
+        <select id="f-res-status">${resOpts}</select>
       </div>
       <div class="form-row">
         <label>Reservation URL</label>
-        <input id="f-res-url" type="url" placeholder="https://..." value="${escapeAttr(s.reservation_url || "")}" />
+        <input id="f-res-url" type="url" placeholder="https://catchtable.co.kr/..." value="${escapeAttr(s.reservation_url || "")}" />
+      </div>
+    </div>
+    <div class="form-grid2">
+      <div class="form-row">
+        <label>Michelin stars (0–3)</label>
+        <input id="f-michelin" type="number" min="0" max="3" step="1" value="${s.michelin || 0}" />
+      </div>
+      <div class="form-row">
+        <label>Currently unavailable?</label>
+        <select id="f-unavailable">
+          <option value="false" ${!s.unavailable ? "selected" : ""}>No, bookable</option>
+          <option value="true" ${s.unavailable ? "selected" : ""}>Yes, marked unavailable</option>
+        </select>
       </div>
     </div>
     <div class="form-grid2">
@@ -635,6 +801,7 @@ function openEditForm(id, options = {}) {
     else openDetailSheet(id);
   });
   sheet.querySelector("#f-save").addEventListener("click", () => {
+    const michelin = parseInt(sheet.querySelector("#f-michelin").value, 10) || 0;
     const updated = {
       ...s,
       name: sheet.querySelector("#f-name").value.trim() || "Untitled",
@@ -644,9 +811,12 @@ function openEditForm(id, options = {}) {
       time: sheet.querySelector("#f-time").value.trim(),
       cost_krw: parseInt(sheet.querySelector("#f-cost").value, 10) || 0,
       area: sheet.querySelector("#f-area").value.trim(),
+      image_url: sheet.querySelector("#f-image").value.trim(),
       hours: sheet.querySelector("#f-hours").value.trim(),
       reservation_status: sheet.querySelector("#f-res-status").value,
       reservation_url: sheet.querySelector("#f-res-url").value.trim(),
+      michelin: michelin || undefined,
+      unavailable: sheet.querySelector("#f-unavailable").value === "true",
       lat: parseFloat(sheet.querySelector("#f-lat").value),
       lng: parseFloat(sheet.querySelector("#f-lng").value),
       blurb: sheet.querySelector("#f-blurb").value.trim()
@@ -661,12 +831,10 @@ function openEditForm(id, options = {}) {
     } else {
       const idx = state.stops.findIndex(x => x.id === s.id);
       if (idx !== -1) {
-        // If day changed, append to end of new day
         if (state.stops[idx].day !== updated.day) {
           updated.order = (stopsForDay(updated.day).length || 0) + 1;
         }
         state.stops[idx] = updated;
-        // Re-pack orders in the (possibly old) day
         reorderDayInState(s.day);
       }
     }
@@ -677,11 +845,6 @@ function openEditForm(id, options = {}) {
   });
 
   showSheet();
-}
-
-function reorderDayInState(day) {
-  const ss = state.stops.filter(s => s.day === day).sort((a, b) => a.order - b.order);
-  ss.forEach((s, i) => s.order = i + 1);
 }
 
 function showSheet() {
@@ -696,38 +859,26 @@ function closeSheet() {
 // ----------- Drop pin -----------
 function startDropPin() {
   dropPinMode = true;
+  switchTab("map");
   document.getElementById("droppin-banner").classList.remove("hidden");
   document.getElementById("map").style.cursor = "crosshair";
-  // On mobile, show map
-  document.getElementById("layout").classList.remove("list-only");
-  document.getElementById("layout").classList.add("map-only");
 }
 function cancelDropPin() {
   dropPinMode = false;
   document.getElementById("droppin-banner").classList.add("hidden");
   document.getElementById("map").style.cursor = "";
-  document.getElementById("layout").classList.remove("map-only");
 }
 function finishDropPin(latlng) {
   cancelDropPin();
-  // Pick day = lowest visible scheduled day with current selection, or 0
   const defaultDay = selectedStopId
     ? (state.stops.find(s => s.id === selectedStopId)?.day ?? 0)
     : 0;
   const draft = {
-    id: uid(),
-    day: defaultDay,
-    order: 999,
-    time: "",
-    type: "other",
-    name: "New stop",
-    name_ko: "",
-    area: "",
-    lat: latlng.lat,
-    lng: latlng.lng,
-    cost_krw: 0,
-    blurb: ""
+    id: uid(), day: defaultDay, order: 999, time: "", type: "other",
+    name: "New stop", name_ko: "", area: "", lat: latlng.lat, lng: latlng.lng,
+    cost_krw: 0, blurb: ""
   };
+  switchTab("stops");
   openEditForm(null, { isNew: true, stop: draft });
 }
 
@@ -742,7 +893,7 @@ function setupSearch() {
     results.innerHTML = "";
     if (searchTimer) clearTimeout(searchTimer);
     if (q.length < 3) return;
-    searchTimer = setTimeout(() => doSearch(q), 1100); // ≥1s debounce
+    searchTimer = setTimeout(() => doSearch(q), 1100);
   });
 
   function doSearch(q) {
@@ -757,8 +908,8 @@ function setupSearch() {
           results.innerHTML = "";
           if (!items.length) {
             const li = document.createElement("li");
-            li.textContent = "No results. Try “📍 Drop pin” instead.";
-            li.style.color = "var(--fg-faint)";
+            li.textContent = "No results. Try “📍 Drop pin” on the map.";
+            li.style.color = "var(--ink-faint)";
             results.appendChild(li);
             return;
           }
@@ -770,20 +921,12 @@ function setupSearch() {
               input.value = "";
               document.getElementById("searchrow").classList.add("hidden");
               const draft = {
-                id: uid(),
-                day: 0,
-                order: 999,
-                time: "",
-                type: "other",
+                id: uid(), day: 0, order: 999, time: "", type: "other",
                 name: it.display_name.split(",")[0].trim(),
-                name_ko: "",
-                area: (it.display_name.split(",")[1] || "").trim(),
-                lat: parseFloat(it.lat),
-                lng: parseFloat(it.lon),
-                cost_krw: 0,
-                blurb: ""
+                name_ko: "", area: (it.display_name.split(",")[1] || "").trim(),
+                lat: parseFloat(it.lat), lng: parseFloat(it.lon),
+                cost_krw: 0, blurb: ""
               };
-              map.setView([draft.lat, draft.lng], 16);
               openEditForm(null, { isNew: true, stop: draft });
             });
             results.appendChild(li);
@@ -803,7 +946,7 @@ function exportJson() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "seoul-eats-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.download = "justin-ashley-seoul-" + new Date().toISOString().slice(0, 10) + ".json";
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
@@ -819,19 +962,19 @@ function importJson(file) {
         throw new Error("Invalid shape");
       }
       if (!confirm("Replace current itinerary with the imported one?")) return;
-      state = {
-        version: SCHEMA_VERSION,
+      state = migrateState({
+        version: parsed.version || 1,
         meta: parsed.meta || state.meta,
         days: parsed.days,
         stops: parsed.stops,
         tripNotes: parsed.tripNotes || "",
         dayNotes: parsed.dayNotes || {}
-      };
+      });
       saveState(); renderAll();
       toast("Imported.");
     } catch (err) {
       console.error(err);
-      alert("Couldn't import — file doesn't look like a Seoul Eats backup.");
+      alert("Couldn't import — file doesn't look like a valid backup.");
     }
   };
   reader.readAsText(file);
@@ -850,6 +993,55 @@ function setDark(on) {
   document.body.classList.toggle("dark", on);
   try { localStorage.setItem(DARK_KEY, on ? "1" : "0"); } catch (e) {}
   document.getElementById("btn-darkmode").textContent = on ? "☀️" : "🌙";
+}
+
+// ----------- Tabs -----------
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(t => {
+    const isActive = t.id === "tab-" + tab;
+    t.classList.toggle("active", isActive);
+    t.setAttribute("aria-selected", isActive);
+  });
+  document.querySelectorAll(".panel").forEach(p => {
+    p.classList.toggle("hidden", p.id !== "panel-" + tab);
+  });
+  if (tab === "map") {
+    setupMap();
+    rebuildMarkers();
+    setTimeout(() => map && map.invalidateSize(), 80);
+  }
+}
+
+// ----------- Migration banner -----------
+function showMigrationBanner() {
+  if (!migrationSnapshot) return;
+  const { addedIds, addedMichelinIds, patchedIds } = migrationSnapshot;
+  const banner = document.getElementById("migration-banner");
+  const text = document.getElementById("migration-text");
+  const parts = [];
+  if (addedMichelinIds && addedMichelinIds.length) {
+    const otherAdded = addedIds.length - addedMichelinIds.length;
+    parts.push(`added ${addedMichelinIds.length} Michelin-star backup${addedMichelinIds.length === 1 ? "" : "s"}${otherAdded > 0 ? ` and ${otherAdded} other stop${otherAdded === 1 ? "" : "s"}` : ""}`);
+  } else if (addedIds.length) {
+    parts.push(`added ${addedIds.length} new stop${addedIds.length === 1 ? "" : "s"}`);
+  }
+  if (patchedIds.length) parts.push(`updated ${patchedIds.length} stop${patchedIds.length === 1 ? "" : "s"} with new info`);
+  text.textContent = "✨ " + parts.join(" and ") + ".";
+  banner.classList.remove("hidden");
+  document.getElementById("btn-undo-migration").addEventListener("click", () => {
+    state = JSON.parse(JSON.stringify(migrationSnapshot.prev));
+    state.version = SCHEMA_VERSION;  // keep version high so migration doesn't re-run
+    migrationSnapshot = null;
+    saveState();
+    renderAll();
+    banner.classList.add("hidden");
+    toast("Undone.");
+  }, { once: true });
+  document.getElementById("btn-dismiss-migration").addEventListener("click", () => {
+    migrationSnapshot = null;
+    banner.classList.add("hidden");
+  }, { once: true });
 }
 
 // ----------- Wire up UI -----------
@@ -896,46 +1088,26 @@ function wireUp() {
     setDark(!document.body.classList.contains("dark"));
   });
 
-  document.getElementById("btn-view-toggle").addEventListener("click", () => {
-    const layout = document.getElementById("layout");
-    if (layout.classList.contains("map-only")) {
-      layout.classList.remove("map-only");
-      layout.classList.add("list-only");
-      document.getElementById("btn-view-toggle").textContent = "🗺️";
-    } else if (layout.classList.contains("list-only")) {
-      layout.classList.remove("list-only");
-      document.getElementById("btn-view-toggle").textContent = "📋";
-    } else {
-      layout.classList.add("map-only");
-      document.getElementById("btn-view-toggle").textContent = "📋";
-    }
-    setTimeout(() => map.invalidateSize(), 200);
-  });
+  document.getElementById("tab-stops").addEventListener("click", () => switchTab("stops"));
+  document.getElementById("tab-map").addEventListener("click", () => switchTab("map"));
+  document.getElementById("tab-info").addEventListener("click", () => switchTab("info"));
 
   document.getElementById("trip-notes").addEventListener("input", (e) => {
     state.tripNotes = e.target.value; saveState();
   });
 }
 
-// ----------- Escaping -----------
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-function escapeAttr(s) { return escapeHtml(s); }
-
 // ----------- Boot -----------
 function boot() {
   state = loadState();
+  // If we migrated, persist immediately so a reload doesn't re-trigger.
+  if (migrationSnapshot) saveState();
   const darkPref = localStorage.getItem(DARK_KEY);
   if (darkPref === "1") setDark(true);
-  setupMap();
   renderAll();
   wireUp();
   setupSearch();
-  // Make sure Leaflet sizes correctly after CSS settles
-  setTimeout(() => map.invalidateSize(), 80);
+  if (migrationSnapshot) showMigrationBanner();
 }
 
 document.addEventListener("DOMContentLoaded", boot);
