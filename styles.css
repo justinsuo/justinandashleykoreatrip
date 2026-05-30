@@ -385,6 +385,14 @@ a:hover { text-decoration: underline; }
 }
 .card-meta .dot { color: var(--border-strong); }
 .card-cost { font-weight: 600; color: var(--ink); }
+.sched-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+}
+.sched-closed   { background: var(--persimmon-soft); color: var(--persimmon); }
+.sched-weekends { background: var(--gold-soft); color: var(--gold); }
+.sched-daily    { background: rgba(52, 116, 110, 0.12); color: var(--jade); }
 .card-blurb {
   font-size: 12.5px; color: var(--ink-soft); line-height: 1.45;
   margin-top: 4px;

@@ -10,11 +10,24 @@ const SCHEMA_VERSION = 2;   // bumped: adds michelin field + image_url + new Mic
 
 // Type -> emoji
 const TYPE_EMOJI = {
-  bbq: "🥩", market: "🍢", cafe: "☕", bar: "🍺",
+  bbq: "🥩", market: "🛒", cafe: "☕", bar: "🍸",
+  streetfood: "🍢",
   noodles: "🍜", soup: "🍲", seafood: "🦀", dessert: "🍧",
   park: "🌳", splurge: "⭐", other: "📍"
 };
 const TYPE_OPTIONS = Object.keys(TYPE_EMOJI);
+// Pretty labels for per-type subsections in the Ideas tray
+const TYPE_LABEL = {
+  bbq: "BBQ", market: "Markets", cafe: "Cafés", bar: "Bars",
+  streetfood: "Street food", noodles: "Noodles", soup: "Soups",
+  seafood: "Seafood", dessert: "Desserts", park: "Parks",
+  splurge: "Splurges", other: "Other"
+};
+// Subsection order in the Ideas tray (after Michelin)
+const IDEAS_TYPE_ORDER = [
+  "streetfood", "bar", "bbq", "noodles", "soup", "market",
+  "cafe", "seafood", "dessert", "park", "splurge", "other"
+];
 
 // Reservation status meta
 const RES_STATUS = {
@@ -94,11 +107,17 @@ function migrateState(saved) {
   const existingIds = new Set(next.stops.map(s => s.id));
   const added = [];
   const addedMichelin = [];
+  const addedByType = {}; // non-michelin counts, keyed by type
   for (const seedStop of seed.stops) {
     if (!existingIds.has(seedStop.id)) {
       next.stops.push(JSON.parse(JSON.stringify(seedStop)));
       added.push(seedStop.id);
-      if (seedStop.michelin) addedMichelin.push(seedStop.id);
+      if (seedStop.michelin) {
+        addedMichelin.push(seedStop.id);
+      } else {
+        const t = seedStop.type || "other";
+        addedByType[t] = (addedByType[t] || 0) + 1;
+      }
     }
   }
 
@@ -118,6 +137,7 @@ function migrateState(saved) {
       prev: saved,
       addedIds: added,
       addedMichelinIds: addedMichelin,
+      addedByType,
       patchedIds: patched
     };
   }
@@ -156,6 +176,17 @@ function haversineKm(a, b) {
 }
 function walkMin(km) { return Math.round(km * 12); }
 function stars(n) { return "★".repeat(n || 0); }
+
+// Pull "CLOSED ..." / "WEEKENDS ONLY" / "OPEN DAILY" hints out of a blurb so the
+// schedule pill on each card warns me before I drag a bar into the wrong night.
+function parseSchedule(blurb) {
+  if (!blurb) return null;
+  const closed = blurb.match(/CLOSED\s+([^.,;]+)/i);
+  if (closed) return { kind: "closed", label: "Closed " + closed[1].trim().replace(/\s+/g, " ") };
+  if (/WEEKENDS\s+ONLY/i.test(blurb)) return { kind: "weekends", label: "Weekends only" };
+  if (/OPEN\s+DAILY/i.test(blurb)) return { kind: "daily", label: "Open daily" };
+  return null;
+}
 
 function lighten(hex, amount = 0.5) {
   const m = /^#?([a-f\d]{6})$/i.exec(hex);
@@ -333,11 +364,10 @@ function buildDayGroup(d) {
   });
   group.appendChild(head);
 
-  // Day 0 is special: split into Michelin subsection + regular ideas.
+  // Day 0 is special: Michelin first, then per-type subsections.
   if (d.day === 0) {
     const michelin = stops.filter(s => s.michelin)
       .sort((a, b) => (b.michelin || 0) - (a.michelin || 0));
-    const others = stops.filter(s => !s.michelin);
 
     if (michelin.length) {
       const sh = document.createElement("div");
@@ -346,11 +376,26 @@ function buildDayGroup(d) {
       group.appendChild(sh);
       group.appendChild(buildStopList(d, michelin, "michelin"));
     }
-    const otherHead = document.createElement("div");
-    otherHead.className = "subsection-head";
-    otherHead.textContent = "Other ideas";
-    group.appendChild(otherHead);
-    group.appendChild(buildStopList(d, others, "other"));
+
+    // Bucket non-Michelin by type, then render each type as its own subsection
+    // in IDEAS_TYPE_ORDER. Anything with an unknown type falls into "other".
+    const byType = {};
+    for (const s of stops) {
+      if (s.michelin) continue;
+      const t = TYPE_EMOJI[s.type] ? s.type : "other";
+      (byType[t] = byType[t] || []).push(s);
+    }
+    const typesPresent = IDEAS_TYPE_ORDER.filter(t => byType[t] && byType[t].length);
+    // Append any types not in IDEAS_TYPE_ORDER at the end (defensive)
+    Object.keys(byType).forEach(t => { if (!typesPresent.includes(t)) typesPresent.push(t); });
+
+    typesPresent.forEach(t => {
+      const sh = document.createElement("div");
+      sh.className = "subsection-head";
+      sh.textContent = `${TYPE_EMOJI[t] || "📍"} ${TYPE_LABEL[t] || t}`;
+      group.appendChild(sh);
+      group.appendChild(buildStopList(d, byType[t], "type-" + t));
+    });
   } else {
     group.appendChild(buildStopList(d, stops, "scheduled"));
   }
@@ -468,6 +513,12 @@ function buildStopCard(s, d, idx, stopsInDay) {
       <div class="card-meta">
         ${s.area ? `<span>📍 ${escapeHtml(s.area)}</span>` : ""}
         ${s.cost_krw ? `<span class="card-cost">${fmtKRW(s.cost_krw)}</span>` : ""}
+        ${(() => {
+          const sched = parseSchedule(s.blurb);
+          if (!sched) return "";
+          const icon = sched.kind === "closed" ? "⚠️" : sched.kind === "weekends" ? "📅" : "🕒";
+          return `<span class="sched-pill sched-${sched.kind}">${icon} ${escapeHtml(sched.label)}</span>`;
+        })()}
         ${distMeta}
       </div>
       ${s.blurb ? `<div class="card-blurb">${escapeHtml(s.blurb)}</div>` : ""}
@@ -1016,18 +1067,40 @@ function switchTab(tab) {
 // ----------- Migration banner -----------
 function showMigrationBanner() {
   if (!migrationSnapshot) return;
-  const { addedIds, addedMichelinIds, patchedIds } = migrationSnapshot;
+  const { addedIds, addedMichelinIds, addedByType, patchedIds } = migrationSnapshot;
   const banner = document.getElementById("migration-banner");
   const text = document.getElementById("migration-text");
-  const parts = [];
+
+  // Build categorised "added" phrase
+  const chunks = [];
   if (addedMichelinIds && addedMichelinIds.length) {
-    const otherAdded = addedIds.length - addedMichelinIds.length;
-    parts.push(`added ${addedMichelinIds.length} Michelin-star backup${addedMichelinIds.length === 1 ? "" : "s"}${otherAdded > 0 ? ` and ${otherAdded} other stop${otherAdded === 1 ? "" : "s"}` : ""}`);
-  } else if (addedIds.length) {
-    parts.push(`added ${addedIds.length} new stop${addedIds.length === 1 ? "" : "s"}`);
+    chunks.push(`${addedMichelinIds.length} Michelin backup${addedMichelinIds.length === 1 ? "" : "s"}`);
+  }
+  if (addedByType) {
+    const labelMap = { streetfood: "street food pick", bar: "night bar", bbq: "BBQ", cafe: "café", noodles: "noodle spot", soup: "soup spot", market: "market", seafood: "seafood", dessert: "dessert", park: "park", splurge: "splurge", other: "stop" };
+    const namedTypes = ["streetfood", "bar"]; // the ones worth calling out by name
+    let otherCount = 0;
+    namedTypes.forEach(t => {
+      if (addedByType[t]) {
+        const lbl = labelMap[t] || t;
+        chunks.push(`${addedByType[t]} ${lbl}${addedByType[t] === 1 ? "" : "s"}`);
+      }
+    });
+    Object.keys(addedByType).forEach(t => {
+      if (!namedTypes.includes(t)) otherCount += addedByType[t];
+    });
+    if (otherCount > 0) {
+      chunks.push(`${otherCount} other stop${otherCount === 1 ? "" : "s"}`);
+    }
+  }
+
+  const parts = [];
+  if (chunks.length) {
+    const joined = chunks.length === 1 ? chunks[0] : chunks.slice(0, -1).join(", ") + " and " + chunks[chunks.length - 1];
+    parts.push("added " + joined + " to your Ideas tray");
   }
   if (patchedIds.length) parts.push(`updated ${patchedIds.length} stop${patchedIds.length === 1 ? "" : "s"} with new info`);
-  text.textContent = "✨ " + parts.join(" and ") + ".";
+  text.textContent = "✨ " + parts.join(", and ") + ".";
   banner.classList.remove("hidden");
   document.getElementById("btn-undo-migration").addEventListener("click", () => {
     state = JSON.parse(JSON.stringify(migrationSnapshot.prev));

@@ -63,6 +63,15 @@ python -m http.server 8000
 
 (or `npx serve`)
 
+## Suggested fits for the swap-in ideas
+
+- **Bamdokkaebi Night Market (Han River food trucks)** → Sun Jun 7 (Day 1) **if** the seasonal schedule confirms (Fri–Sun evenings, spring–autumn). It's the cool one.
+- **Saeseoul (rooftop bar)** → Day 3 nightcap after Ikseon BBQ — it's a 1-minute walk away.
+- **Charles H. (Four Seasons speakeasy)** or **Jongno Pocha Street (orange-tent stalls)** → Day 2 central nightcap, both walkable from Euljiro.
+- **Zest** + **Le Chamber** (Cheongdam pair) → pair with a Gangnam splurge night (Day 4 Wed, after Mingles backups like Mosu, Soigné, Allen, Evett).
+- **Bar Cham** → Day 4 Seochon nightcap (closed Tuesdays only — Wed is fine).
+- **Slow Brew** → anytime you want makgeolli & jeon instead of cocktails.
+
 ## Notes & gotchas
 
 - **Nominatim policy:** searches are debounced to ≥1s and limited to 5 results. If a search returns nothing, drop a pin instead.
