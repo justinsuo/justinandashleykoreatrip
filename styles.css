@@ -7,57 +7,58 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; }
 
-/* ----------- Palette — "Editorial" theme (Linear/Notion-inspired)
-   Cool neutral surface, hairline borders, bold single accent. ----------- */
+/* ----------- Palette — "Stripe" theme
+   White surfaces, indigo accent, deep-navy ink, signature multi-color
+   gradient washes. Inspired by stripe.com. ----------- */
 :root {
-  --paper:        #f4f4f5;   /* zinc-100, cool neutral (not yellow) */
-  --paper-soft:   #fafafa;
+  --paper:        #ffffff;
+  --paper-soft:   #f6f9fc;   /* Stripe's faint blue-gray panel bg */
   --card:         #ffffff;
-  --card-warm:    #fafafa;
-  --ink:          #09090b;   /* near-black */
-  --ink-soft:     #52525b;   /* zinc-600 */
-  --ink-faint:    #a1a1aa;   /* zinc-400 */
-  --border:       #e4e4e7;   /* zinc-200 */
-  --border-strong:#d4d4d8;   /* zinc-300 */
+  --card-warm:    #f6f9fc;
+  --ink:          #0a2540;   /* Stripe deep navy text */
+  --ink-soft:     #425466;
+  --ink-faint:    #8898aa;
+  --border:       #e6ebf1;
+  --border-strong:#cfd7df;
 
-  --persimmon:    #dc2626;   /* primary — red-600, bold + food-friendly */
-  --persimmon-soft:#fef2f2;  /* red-50 */
-  --jade:         #16a34a;   /* secondary — green-600 (booked / OK) */
-  --gold:         #ca8a04;   /* tertiary — yellow-600 for Michelin stars */
-  --gold-soft:    #fef9c3;   /* yellow-100 */
-  --indigo:       #4f46e5;
-  --plum:         #9333ea;
+  --persimmon:    #635bff;   /* Stripe indigo (primary accent) */
+  --persimmon-soft:#ebebff;
+  --jade:         #00d4a4;   /* Stripe success cyan-green */
+  --gold:         #ff9d00;
+  --gold-soft:    #fff7e0;
+  --indigo:       #635bff;
+  --plum:         #7a73ff;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.10);
+  --shadow-sm: 0 2px 5px 0 rgba(60, 66, 87, 0.08), 0 1px 1px 0 rgba(0,0,0,0.04);
+  --shadow-md: 0 7px 14px 0 rgba(60, 66, 87, 0.10), 0 3px 6px 0 rgba(0,0,0,0.06);
+  --shadow-lg: 0 15px 35px 0 rgba(60, 66, 87, 0.14), 0 5px 15px 0 rgba(0,0,0,0.08);
 
-  --radius:    10px;          /* tighter, more architectural */
-  --radius-sm: 6px;
+  --radius:    8px;           /* Stripe uses slightly tighter corners */
+  --radius-sm: 5px;
 }
 
 body.dark {
-  --paper:        #09090b;   /* zinc-950 */
-  --paper-soft:   #18181b;
-  --card:         #18181b;   /* zinc-900 */
-  --card-warm:    #27272a;
-  --ink:          #fafafa;
-  --ink-soft:     #a1a1aa;
-  --ink-faint:    #71717a;
-  --border:       #27272a;
-  --border-strong:#3f3f46;
+  --paper:        #0a2540;   /* Stripe dark navy */
+  --paper-soft:   #122a4d;
+  --card:         #1a3a6e;
+  --card-warm:    #122a4d;
+  --ink:          #ffffff;
+  --ink-soft:     #adbdcc;
+  --ink-faint:    #8898aa;
+  --border:       #1c3461;
+  --border-strong:#2d4a7e;
 
-  --persimmon:    #f87171;   /* lighter red for dark bg */
-  --persimmon-soft:#7f1d1d;
-  --jade:         #4ade80;
-  --gold:         #facc15;
-  --gold-soft:    #422006;
-  --indigo:       #818cf8;
-  --plum:         #c084fc;
+  --persimmon:    #7a73ff;
+  --persimmon-soft:#241f5e;
+  --jade:         #00d4a4;
+  --gold:         #ffc857;
+  --gold-soft:    #3a2906;
+  --indigo:       #7a73ff;
+  --plum:         #a78bff;
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
-  --shadow-md: 0 6px 24px rgba(0,0,0,0.55);
-  --shadow-lg: 0 18px 48px rgba(0,0,0,0.65);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,0.6);
 }
 
 /* ----------- Base ----------- */
@@ -65,14 +66,42 @@ body {
   font-family: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14.5px;
   color: var(--ink);
-  background: var(--paper);
+  /* Stripe signature: subtle multi-color gradient wash on top of white */
+  background:
+    radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(99, 91, 255, 0.10), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 95% -5%, rgba(0, 212, 164, 0.08), transparent 55%),
+    radial-gradient(ellipse 800px 500px at 50% 110%, rgba(255, 91, 162, 0.06), transparent 55%),
+    var(--paper);
+  background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.011em;
+  font-feature-settings: "cv11", "ss01";
+}
+body.dark {
+  background:
+    radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(122, 115, 255, 0.25), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 95% -5%, rgba(0, 212, 164, 0.12), transparent 55%),
+    radial-gradient(ellipse 800px 500px at 50% 110%, rgba(255, 91, 162, 0.10), transparent 55%),
+    var(--paper);
+  background-attachment: fixed;
 }
 
-h1, h2, h3, h4 { margin: 0; font-family: 'Instrument Serif', 'Fraunces', 'Noto Serif KR', Georgia, serif; font-weight: 400; letter-spacing: -0.02em; }
-.amp { font-style: italic; color: var(--persimmon); font-family: 'Instrument Serif', serif; font-weight: 400; }
+h1, h2, h3, h4 {
+  margin: 0;
+  font-family: 'Inter', 'Pretendard', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  color: var(--ink);
+}
+.amp {
+  font-weight: 700;
+  background: linear-gradient(135deg, #635bff 0%, #ff5ba2 50%, #00d4a4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-style: normal;
+}
 
 button { font-family: inherit; cursor: pointer; }
 input, textarea, select { font-family: inherit; font-size: 14px; }
@@ -221,7 +250,7 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow-sm);
 }
 .totals .trip-total {
-  font-family: 'Instrument Serif', serif; font-weight: 600; font-size: 22px; color: var(--persimmon);
+  font-family: 'Inter', sans-serif; font-weight: 600; font-size: 22px; color: var(--persimmon);
   letter-spacing: -0.015em;
 }
 
@@ -255,12 +284,12 @@ a:hover { text-decoration: underline; }
   width: 44px; height: 44px;
   border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  color: white; font-family: 'Instrument Serif', serif; font-weight: 600; font-size: 18px;
+  color: white; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 18px;
   background: var(--day-color, var(--ink-faint));
   flex-shrink: 0;
 }
 .day-head .day-title {
-  font-family: 'Instrument Serif', serif; font-weight: 600; font-size: 18px;
+  font-family: 'Inter', sans-serif; font-weight: 600; font-size: 18px;
   line-height: 1.2;
 }
 .day-head .day-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
@@ -270,7 +299,7 @@ a:hover { text-decoration: underline; }
 }
 
 .subsection-head {
-  font-family: 'Instrument Serif', serif; font-weight: 500; font-size: 14px;
+  font-family: 'Inter', sans-serif; font-weight: 500; font-size: 14px;
   color: var(--gold); letter-spacing: 0.02em; text-transform: uppercase;
   padding: 14px 4px 8px;
   display: flex; align-items: center; gap: 8px;
@@ -346,7 +375,7 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.02em;
 }
 .order-num {
-  font-family: 'Instrument Serif', serif; font-weight: 600;
+  font-family: 'Inter', sans-serif; font-weight: 600;
   background: white; color: var(--day-color, var(--ink));
   width: 18px; height: 18px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
@@ -386,7 +415,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid #fda4af;
   border-radius: 999px;
   font-size: 12.5px; font-weight: 600; color: #be123c;
-  font-family: 'Instrument Serif', serif; font-style: italic;
+  font-family: 'Inter', sans-serif; font-style: italic;
   letter-spacing: 0.005em;
 }
 body.dark .personal-note {
@@ -430,7 +459,7 @@ body.dark .slot-pill.slot-sight     { color: #6ee7b7; }
 
 .card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
 .card-name {
-  font-family: 'Instrument Serif', serif; font-weight: 500; font-size: 16px;
+  font-family: 'Inter', sans-serif; font-weight: 500; font-size: 16px;
   line-height: 1.2; color: var(--ink);
   display: flex; align-items: center; gap: 6px;
 }
@@ -542,7 +571,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
   border: 1px solid var(--pin-color, #888);
   transform: rotate(45deg);
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
 }
 
 /* ----------- Sheet / modal ----------- */
@@ -578,7 +607,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   border-radius: 18px; padding: 22px; max-width: 92vw; width: 440px;
   z-index: 1000; box-shadow: var(--shadow-lg);
 }
-.modal h2 { margin-bottom: 12px; font-size: 22px; font-family: 'Instrument Serif', serif; }
+.modal h2 { margin-bottom: 12px; font-size: 22px; font-family: 'Inter', sans-serif; }
 .modal ul { padding-left: 20px; margin: 0 0 16px; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
 .modal button { padding: 10px 18px; border-radius: 999px; border: none; background: var(--persimmon); color: white; font-weight: 600; }
 
@@ -598,7 +627,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
 
 .detail-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .detail-name {
-  font-family: 'Instrument Serif', serif; font-size: 22px; font-weight: 500; line-height: 1.2;
+  font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 500; line-height: 1.2;
   letter-spacing: -0.01em;
 }
 .detail-name-ko { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
@@ -699,7 +728,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   position: relative;
 }
 .for-ashley-card h2 {
-  font-family: 'Instrument Serif', serif; font-weight: 500;
+  font-family: 'Inter', sans-serif; font-weight: 500;
   font-size: 26px; color: var(--persimmon);
   margin-bottom: 10px; letter-spacing: -0.01em;
 }
@@ -728,8 +757,8 @@ body.dark .for-ashley-card textarea:focus { background: rgba(0,0,0,0.4); }
   padding: 22px 24px; max-width: 720px; margin: 0 auto;
   box-shadow: var(--shadow-sm);
 }
-.info-card h2 { font-size: 28px; font-family: 'Instrument Serif', serif; font-weight: 500; margin-bottom: 12px; }
-.info-card h3 { font-size: 17px; font-family: 'Instrument Serif', serif; font-weight: 600; margin: 22px 0 8px; color: var(--persimmon); }
+.info-card h2 { font-size: 28px; font-family: 'Inter', sans-serif; font-weight: 500; margin-bottom: 12px; }
+.info-card h3 { font-size: 17px; font-family: 'Inter', sans-serif; font-weight: 600; margin: 22px 0 8px; color: var(--persimmon); }
 .info-card p, .info-card ul { font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
 .info-card ul { padding-left: 22px; }
 .info-card li { margin-bottom: 6px; }
@@ -751,7 +780,7 @@ body.dark .for-ashley-card textarea:focus { background: rgba(0,0,0,0.4); }
 
 /* ----------- Calendar tab ----------- */
 .calendar-toolbar { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.calendar-title { font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; }
+.calendar-title { font-family: 'Inter', sans-serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; }
 .calendar-hint { font-size: 12px; color: var(--ink-soft); }
 
 .calendar-grid {
@@ -782,7 +811,7 @@ body.dark .for-ashley-card textarea:focus { background: rgba(0,0,0,0.4); }
 }
 .cal-day-num {
   grid-row: 1 / 3;
-  font-family: 'Instrument Serif', serif; font-size: 38px; font-weight: 400;
+  font-family: 'Inter', sans-serif; font-size: 38px; font-weight: 400;
   color: var(--day-color, var(--persimmon)); line-height: 1; align-self: start;
   letter-spacing: -0.04em;
 }

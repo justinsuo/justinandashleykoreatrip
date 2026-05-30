@@ -326,10 +326,10 @@ window.SEED_ITINERARY = {
       image_url: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAGlYBtjQ49a4s0HMh6T-T1G1POAXvDBl8SsWjLKKjxMdKDS39z5H5cTb3w_r1T7zB-f0PW28-EATu9Lbv8BGlJUNm0nc9lznaLHGRm5aYgAPLkc72qnlg8GOrYi3PGYOM3Yn1tjeqKvOmA=w800-h600-k-no",
       reservation_status: "unlikely",
       slot: "bar" },
-    { id: "night4-pineco", day: 4, order: 5, time: "22:30", type: "bar",
+    { id: "night4-pineco", day: 0, order: 70, time: "", type: "bar", slot: "bar",
       name: "Pine&Co", name_ko: "파인앤코", area: "Gangnam (Seolleung)",
       lat: 37.5262836, lng: 127.0370432, cost_krw: 45000, place_id: "ChIJrfK6ThqjfDURFv6cbuVlLlY",
-      blurb: "Night 4 nightcap — intimate hidden Gangnam cocktail bar (4.7★), open daily. Pairs with a Gangnam splurge dinner; swap if you stay central.",
+      blurb: "Hidden Gangnam cocktail bar (4.7★), open daily. Bumped from Day 4 by Casa Corona; drag back in if you prefer the Gangnam end of the night.",
       image_url: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEax3aMv21RntpxO7crwZX08bCCFnW7sfGMqB8F1ntfxhHmOipf2tlC-QS1_u7STnv0RJtLYJNzkzAo7Q1dsBuNwGbn8iuNWBvVy740zkkyi_bvoJg8QJsD9IlsowVjb1nEa-x7Pq0hm8X6=w800-h600-k-no",
       reservation_status: "unlikely",
       slot: "bar" },
@@ -440,6 +440,15 @@ window.SEED_ITINERARY = {
       lat: 37.520782, lng: 126.9269161, cost_krw: 12000, place_id: "ChIJg3mO-z2ffDURxBvzNdq99p4",
       reservation_status: "unlikely",
       blurb: "Bonus lunch — famous kongguksu (chilled soy-milk noodles), perfect for June heat, + mandu. Opens 10. CLOSED Sundays.",
-      image_url: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAGOKHHgsjXuP5xx9cMJLmDaVPUZGetnaHu8iIo6r3beki2lfXJSNKtW1vfqnNT88akdoP70cmGzg2KDkIirbOtKbtrNj_KG3HViS3_B-HURkgZINvGTZ6U-mHmHhqWfA9oIIlpobg=w800-h600-k-no" }
+      image_url: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAGOKHHgsjXuP5xx9cMJLmDaVPUZGetnaHu8iIo6r3beki2lfXJSNKtW1vfqnNT88akdoP70cmGzg2KDkIirbOtKbtrNj_KG3HViS3_B-HURkgZINvGTZ6U-mHmHhqWfA9oIIlpobg=w800-h600-k-no" },
+
+    // ===== Casa Corona Seoul — Day 4 nightcap (Itaewon rooftop, Wed-only-open works) =====
+    { id: "casa-corona", day: 4, order: 5, time: "23:00", type: "bar", slot: "bar",
+      name: "Casa Corona Seoul", name_ko: "카사 코로나 서울", area: "Itaewon",
+      lat: 37.5340983, lng: 126.9945352, cost_krw: 45000, place_id: "ChIJtS3POgCjfDURwMqQ-B_917Y",
+      website: "https://toon.fm/casacoronaseoul",
+      image: "https://lh3.googleusercontent.com/place-photos/AJRVUZMC9_2IxapV3bvsWVro8-ImXd8QYCcj351JKNsJmvogJKHXBQcvl4-QNz1HIbSkVSklC43G6c8g5e1Uy-0-8HwqjgVuewyEUWcNSSu5y4N9R7nyMOx_ZFbqXsNNHSf6aej6oFoqgMWsvpcnICUGOYW7eA=s4800-w800-h600",
+      reservation_status: "unlikely",
+      blurb: "Day 4 nightcap — stylish Itaewon rooftop, European vibe + house music, 4.9★ cocktails. Open Wed–Sun 6pm–3am (so this Wednesday works); CLOSED Mon & Tue." }
   ]
 };

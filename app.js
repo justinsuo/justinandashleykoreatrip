@@ -179,8 +179,13 @@ function migrateState(saved) {
   // After force-applying booked placements above, any *other* stop already
   // occupying the same day+slot gets bumped to the Ideas tray (day 0) so the
   // booking has its slot. We never bump another booked stop.
+  // ALSO applies when a brand-new seed stop is added with a specific
+  // day+slot (e.g. Casa Corona arriving for Day 4 bar), so its slot
+  // gets cleared even though it isn't "booked".
   for (const seedStop of seed.stops) {
-    if (seedStop.reservation_status !== "booked") continue;
+    const isBooked = seedStop.reservation_status === "booked";
+    const isNewPlacement = added.includes(seedStop.id) && seedStop.day !== 0 && seedStop.slot;
+    if (!isBooked && !isNewPlacement) continue;
     const conflicts = next.stops.filter(s =>
       s.id !== seedStop.id &&
       s.day === seedStop.day &&
@@ -191,6 +196,27 @@ function migrateState(saved) {
       c.day = 0;
       c.order = 100 + Math.floor(Math.random() * 50);
       if (!patched.includes(c.id)) patched.push(c.id);
+    }
+  }
+
+  // Also: if seed moves an existing stop to day 0 (a "demote to pool"
+  // intentional update — like night4-pineco after Casa Corona arrives),
+  // apply it ONLY when the user's existing copy is still at the previous
+  // seed-canonical position. Heuristic: if existing.day != 0 AND seed.day
+  // == 0 AND existing's current day+slot matches a seed position that no
+  // longer exists, demote. Simpler: just hard-list these by id.
+  const POOL_DEMOTIONS = ["night4-pineco", "schedule-seongsu"];
+  for (const id of POOL_DEMOTIONS) {
+    const seedStop = seed.stops.find(s => s.id === id);
+    const existing = next.stops.find(s => s.id === id);
+    if (!seedStop || !existing) continue;
+    if (seedStop.day === 0 && existing.day !== 0) {
+      // Only demote if user hasn't already moved it somewhere meaningful.
+      // We allow demotion when existing is at a scheduled day with no recent edits.
+      existing.day = 0;
+      existing.slot = seedStop.slot;
+      existing.order = seedStop.order;
+      if (!patched.includes(id)) patched.push(id);
     }
   }
 
@@ -647,9 +673,10 @@ function buildStopCard(s, d, idx, stopsInDay) {
     ? `<span class="res-pill ${resStatus}">${resInfo.emoji} ${resInfo.short}</span>`
     : "";
 
-  // Hero with image + fallback
-  const heroImg = s.image_url
-    ? `<img src="${escapeAttr(s.image_url)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" />
+  // Hero with image + fallback. Accept both `image` and `image_url` field names.
+  const imgUrl = s.image || s.image_url;
+  const heroImg = imgUrl
+    ? `<img src="${escapeAttr(imgUrl)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" />
        <div class="hero-emoji" style="display:none;background:linear-gradient(135deg, ${d.color}, ${lighten(d.color, -0.25) || d.color});">${emoji}</div>`
     : `<div class="hero-emoji" style="background:linear-gradient(135deg, ${d.color}, ${lighten(d.color, -0.25) || d.color});">${emoji}</div>`;
 
@@ -892,8 +919,9 @@ function openDetailSheet(id) {
   const resInfo = RES_STATUS[resStatus];
 
   const heroBg = `linear-gradient(135deg, ${meta.color}, ${lighten(meta.color, -0.25) || meta.color})`;
-  const heroImg = s.image_url
-    ? `<img src="${escapeAttr(s.image_url)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" /><div class="hero-emoji-big" style="display:none;background:${heroBg};">${emoji}</div>`
+  const detailImgUrl = s.image || s.image_url;
+  const heroImg = detailImgUrl
+    ? `<img src="${escapeAttr(detailImgUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" /><div class="hero-emoji-big" style="display:none;background:${heroBg};">${emoji}</div>`
     : `<div class="hero-emoji-big" style="background:${heroBg};">${emoji}</div>`;
 
   const sheet = document.getElementById("sheet-content");
@@ -1473,6 +1501,19 @@ function wireUp() {
 
   document.getElementById("btn-save").addEventListener("click", openSnapshotsModal);
   document.getElementById("btn-share").addEventListener("click", copyShareLink);
+
+  // Re-sync button (Trip Info tab) — wipes local cache and reloads
+  const resyncBtn = document.getElementById("btn-resync");
+  if (resyncBtn) {
+    resyncBtn.addEventListener("click", () => {
+      if (!confirm("Clear local cache and reload the latest plan? Your local edits will be lost (Export first to keep them).")) return;
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {}
+      // Hard reload with cache-bust
+      location.href = location.pathname + "?t=" + Date.now();
+    });
+  }
   document.getElementById("btn-snapshots-close").addEventListener("click", closeSnapshotsModal);
   document.getElementById("snapshots-backdrop").addEventListener("click", closeSnapshotsModal);
   document.getElementById("btn-save-snapshot").addEventListener("click", saveCurrentSnapshot);
