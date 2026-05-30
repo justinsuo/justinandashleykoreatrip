@@ -393,6 +393,36 @@ a:hover { text-decoration: underline; }
 .sched-closed   { background: var(--persimmon-soft); color: var(--persimmon); }
 .sched-weekends { background: var(--gold-soft); color: var(--gold); }
 .sched-daily    { background: rgba(52, 116, 110, 0.12); color: var(--jade); }
+
+/* Inline time chip — clickable on each card, opens native time picker */
+.time-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--persimmon-soft); color: var(--persimmon);
+  font-size: 11px; font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.time-chip:hover { border-color: var(--persimmon); }
+.time-chip.empty { background: var(--card-warm); color: var(--ink-faint); border: 1px dashed var(--border-strong); }
+.time-chip.empty:hover { background: var(--persimmon-soft); color: var(--persimmon); border-style: solid; }
+.time-chip input[type="time"] {
+  background: transparent; border: none; outline: none; padding: 0;
+  color: inherit; font-family: inherit; font-size: 11px; font-weight: 600;
+  width: auto; min-width: 0;
+  cursor: pointer;
+  /* Hide default time-input look */
+  -webkit-appearance: none; appearance: none;
+}
+.time-chip.empty input[type="time"] { width: 0; }
+.time-chip input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: none; opacity: 0.7; cursor: pointer;
+  margin-left: 2px; padding: 0;
+}
+.time-chip .time-icon { font-size: 11px; line-height: 1; }
+.time-chip .time-placeholder { padding-left: 2px; }
+body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
 .card-blurb {
   font-size: 12.5px; color: var(--ink-soft); line-height: 1.45;
   margin-top: 4px;

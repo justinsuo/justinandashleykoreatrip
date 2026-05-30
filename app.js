@@ -505,7 +505,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
       ${heroImg}
       <div class="hero-tags">
         <span class="day-pill" style="background:${d.color};color:white;">
-          ${orderBadge} ${dayLabel}${s.time ? " · " + s.time : ""}
+          ${orderBadge} ${dayLabel}
         </span>
         ${starPill || resPill}
       </div>
@@ -517,6 +517,11 @@ function buildStopCard(s, d, idx, stopsInDay) {
       </div>
       ${s.name_ko ? `<div class="card-name-ko">${escapeHtml(s.name_ko)}</div>` : ""}
       <div class="card-meta">
+        <label class="time-chip ${s.time ? "" : "empty"}" data-no-open="1" title="Click to set time">
+          <span class="time-icon">⏰</span>
+          <input type="time" data-no-open="1" value="${escapeAttr(s.time || "")}" />
+          ${s.time ? "" : `<span class="time-placeholder">Set time</span>`}
+        </label>
         ${s.area ? `<span>📍 ${escapeHtml(s.area)}</span>` : ""}
         ${s.cost_krw ? `<span class="card-cost">${fmtKRW(s.cost_krw)}</span>` : ""}
         ${(() => {
@@ -536,6 +541,31 @@ function buildStopCard(s, d, idx, stopsInDay) {
     </div>
   `;
 
+  // Wire up inline time editing on the card
+  const timeInput = li.querySelector(".time-chip input[type=time]");
+  if (timeInput) {
+    timeInput.addEventListener("change", (e) => {
+      s.time = e.target.value;
+      saveState();
+      // Re-render just this row's chip so the placeholder/value flip applies
+      const chip = li.querySelector(".time-chip");
+      if (chip) {
+        chip.classList.toggle("empty", !s.time);
+        const ph = chip.querySelector(".time-placeholder");
+        if (s.time && ph) ph.remove();
+        else if (!s.time && !ph) {
+          const span = document.createElement("span");
+          span.className = "time-placeholder";
+          span.textContent = "Set time";
+          chip.appendChild(span);
+        }
+      }
+      toast(s.time ? `Time set to ${s.time}` : "Time cleared");
+    });
+    // Prevent click-to-open-detail when clicking the input
+    timeInput.addEventListener("click", (e) => e.stopPropagation());
+  }
+
   li.addEventListener("click", (e) => {
     const target = e.target.closest("[data-no-open]");
     if (target) {
@@ -546,6 +576,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
         copyKorean(s);
       }
       // book-btn is an <a>, its default click navigates — let it through.
+      // time-chip handles its own change event; let it bubble normally.
       return;
     }
     selectStop(s.id);
