@@ -2,7 +2,9 @@
 
 A single-page, fully-editable food-trip map for our 5 days in Seoul. Made for Ashley.
 
-🍜 **Live:** _https://<your-username>.github.io/seoul-food-trip/_ (filled in after first push)
+🍜 **Live:** https://justinsuo.github.io/justinandashleykoreatrip/
+
+📂 **Repo:** https://github.com/justinsuo/justinandashleykoreatrip
 
 ## What it is
 
