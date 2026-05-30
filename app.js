@@ -622,9 +622,9 @@ function buildStopCard(s, d, idx, stopsInDay) {
         </span>
         ${starPill || resPill}
       </div>
-      ${slotPill ? `<div class="hero-tags hero-tags-bottom">${slotPill}</div>` : ""}
     </div>
     <div class="card-body">
+      ${slotPill ? `<div class="slot-row">${slotPill}</div>` : ""}
       <div class="card-name">
         <span style="font-size:18px;">${emoji}</span>
         <span>${escapeHtml(s.name)}</span>
