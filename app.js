@@ -284,12 +284,16 @@ function rebuildMarkers() {
       .addTo(map);
   }
 
+  // Only build day layers for SCHEDULED days (1–5). The Ideas tray (day 0)
+  // is a swap-in pool and never appears on the map.
   state.days.forEach(d => {
+    if (d.day === 0) return;
     dayLayers[d.day] = L.layerGroup();
     if (!hiddenDays.has(d.day)) dayLayers[d.day].addTo(map);
   });
 
   state.stops.forEach(s => {
+    if (s.day === 0) return;                       // skip Ideas tray
     const meta = dayMeta(s.day);
     const emoji = TYPE_EMOJI[s.type] || TYPE_EMOJI.other;
     const orderBadge = s.day === 0 ? "" : String(s.order);
@@ -336,10 +340,11 @@ function renderLegend() {
   state.days.forEach(d => {
     const id = "lg-" + d.day;
     const label = document.createElement("label");
+    if (d.day === 0) label.classList.add("legend-ideas");
     label.innerHTML = `
       <input type="checkbox" id="${id}" ${hiddenDays.has(d.day) ? "" : "checked"} />
       <span class="swatch" style="background:${d.color}"></span>
-      <span>${d.day === 0 ? "Ideas" : "Day " + d.day}</span>
+      <span>${d.day === 0 ? "Ideas <small>(list only)</small>" : "Day " + d.day}</span>
     `;
     label.querySelector("input").addEventListener("change", (e) => {
       if (e.target.checked) hiddenDays.delete(d.day); else hiddenDays.add(d.day);
@@ -1382,8 +1387,10 @@ function wireUp() {
   document.getElementById("btn-droppin").addEventListener("click", startDropPin);
   document.getElementById("btn-droppin-cancel").addEventListener("click", cancelDropPin);
   document.getElementById("btn-fit-all").addEventListener("click", () => {
-    const visible = state.stops.filter(s => !hiddenDays.has(s.day));
-    fitTo(visible.length ? visible : state.stops);
+    // Fit to scheduled, currently-visible stops only (Ideas tray is map-excluded)
+    const visible = state.stops.filter(s => s.day !== 0 && !hiddenDays.has(s.day));
+    const fallback = state.stops.filter(s => s.day !== 0);
+    fitTo(visible.length ? visible : fallback);
   });
   const btnFitHotel = document.getElementById("btn-fit-hotel");
   if (btnFitHotel) {
