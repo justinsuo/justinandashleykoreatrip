@@ -548,10 +548,13 @@ function buildStopList(d, stops, subkind) {
       chosenClass: "sortable-chosen",
       filter: ".unavailable",
       preventOnFilter: false,
-      // Auto-scroll the scrollable panel when dragging near its edges
-      scroll: () => document.getElementById("panel-stops") || document.scrollingElement || true,
-      scrollSensitivity: 80,
-      scrollSpeed: 18,
+      // Auto-scroll the panel when dragging near its top/bottom edges.
+      // SortableJS expects an Element, true (auto-detect parent), or false —
+      // a function isn't supported, so pass the panel element directly.
+      scroll: document.getElementById("panel-stops") || true,
+      forceAutoScrollFallback: true,   // use Sortable's own RAF loop (more reliable than browser auto-scroll)
+      scrollSensitivity: 120,           // pixels from edge before scroll kicks in
+      scrollSpeed: 22,                  // pixels per frame
       bubbleScroll: true,
       onMove: (evt) => !evt.dragged.classList.contains("unavailable"),
       onEnd: handleSortEnd
@@ -613,18 +616,19 @@ function buildStopCard(s, d, idx, stopsInDay) {
     ? `<span class="slot-pill slot-${s.slot}">${slotLabel}</span>`
     : "";
 
+  // Day-pill text differs slightly: order badge only on scheduled days
+  const dayPillHtml = `<span class="day-pill" style="background:${d.color};color:white;">${orderBadge ? orderBadge + " " : ""}${dayLabel}</span>`;
+
   li.innerHTML = `
-    <div class="card-hero">
+    <div class="card-hero" style="--day-color:${d.color}">
       ${heroImg}
-      <div class="hero-tags">
-        <span class="day-pill" style="background:${d.color};color:white;">
-          ${orderBadge} ${dayLabel}
-        </span>
-        ${starPill || resPill}
-      </div>
     </div>
     <div class="card-body">
-      ${slotPill ? `<div class="slot-row">${slotPill}</div>` : ""}
+      <div class="card-header">
+        ${dayPillHtml}
+        ${slotPill}
+        ${starPill || resPill}
+      </div>
       <div class="card-name">
         <span style="font-size:18px;">${emoji}</span>
         <span>${escapeHtml(s.name)}</span>

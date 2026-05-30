@@ -320,6 +320,8 @@ a:hover { text-decoration: underline; }
   position: relative; overflow: hidden;
   background: linear-gradient(135deg, var(--card-color, var(--card-warm)) 0%, var(--card-color-dark, var(--border-strong)) 100%);
   display: flex; align-items: center; justify-content: center;
+  /* Thin day-colored stripe across top — preserves day identity without overlay */
+  border-top: 3px solid var(--day-color, transparent);
 }
 .card-hero img {
   width: 100%; height: 100%; object-fit: cover; display: block;
@@ -332,49 +334,45 @@ a:hover { text-decoration: underline; }
   color: white;
   text-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
-.card-hero .hero-tags {
-  position: absolute; top: 8px; left: 8px; right: 8px;
-  display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;
-  pointer-events: none;
+/* Header strip BELOW the photo — keeps the photo itself unobstructed */
+.card-header {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+  margin-bottom: 4px;
 }
-.card-hero .day-pill {
+.day-pill {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 9px; border-radius: 999px;
-  background: rgba(28, 24, 21, 0.78); color: white;
-  font-size: 11px; font-weight: 600; backdrop-filter: blur(4px);
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.02em;
 }
-.card-hero .order-num {
+.order-num {
   font-family: 'Instrument Serif', serif; font-weight: 600;
   background: white; color: var(--day-color, var(--ink));
-  width: 22px; height: 22px; border-radius: 50%;
+  width: 18px; height: 18px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px;
+  font-size: 11px; margin-right: 2px;
 }
-.card-hero .stars-pill {
-  padding: 4px 9px; border-radius: 999px;
+.stars-pill {
+  padding: 3px 8px; border-radius: 999px;
   background: var(--gold); color: white;
-  font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-  box-shadow: 0 2px 8px rgba(184, 137, 59, 0.4);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
 }
-.card-hero .res-pill {
-  padding: 4px 9px; border-radius: 999px;
-  background: rgba(28,24,21,0.78); color: white;
-  font-size: 11px; font-weight: 600; backdrop-filter: blur(4px);
+.res-pill {
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--card-warm); color: var(--ink-soft);
+  font-size: 10.5px; font-weight: 700;
+  border: 1px solid var(--border);
 }
-.card-hero .res-pill.booked { background: var(--jade); }
-.card-hero .res-pill.needed { background: var(--persimmon); }
+.res-pill.booked { background: var(--jade); color: white; border-color: var(--jade); }
+.res-pill.needed { background: var(--persimmon); color: white; border-color: var(--persimmon); }
 
-/* Slot pill — small label at top of card body (NOT overlaying the photo) */
-.slot-row {
-  display: flex; align-items: center;
-  margin-bottom: 2px;
-}
+/* Slot pill — sits inline in the card-header strip (below photo, never on it) */
 .slot-pill {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: 4px;
+  padding: 3px 8px; border-radius: 999px;
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
-  text-transform: uppercase;
-  background: transparent;
+  background: var(--card-warm);
+  border: 1px solid var(--border);
 }
 .slot-pill.slot-breakfast { color: #b45309; }
 .slot-pill.slot-lunch     { color: #15803d; }
