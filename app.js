@@ -92,179 +92,25 @@ function freshState() {
   };
 }
 
-// Merge new seed stops into existing saved data without losing user edits.
+// MIGRATION — additive only. Your saved state is the source of truth on
+// every reload. Whatever you Save sticks. We never modify or move an
+// existing stop. We only:
+//   1. Add seed stops you don't have yet (by id) at their seed placement
+//   2. Add seed days you don't have yet (defensive)
+//   3. Seed meta.recipient / meta.trip_note ONLY if you've never set one
 function migrateState(saved) {
   const seed = window.SEED_ITINERARY;
   const next = JSON.parse(JSON.stringify(saved));
-  const savedVersion = next.version || 1;
 
-  // Patch michelin field, image_url, unavailable, reservation_url onto existing stops
-  // when the seed knows them but the saved copy doesn't (these are non-destructive
-  // upgrades — they only fill in missing fields).
-  const patched = [];
-  for (const seedStop of seed.stops) {
-    const existing = next.stops.find(s => s.id === seedStop.id);
-    if (existing) {
-      let didPatch = false;
-      if (seedStop.michelin && !existing.michelin) { existing.michelin = seedStop.michelin; didPatch = true; }
-      if (seedStop.image_url) {
-        // Replace if missing OR if it's an old auto-seeded Unsplash URL (legacy
-        // generic stock photos). User-pasted URLs (anything else) stay.
-        const isLegacy = !existing.image_url ||
-          /^https:\/\/images\.unsplash\.com\//.test(existing.image_url);
-        if (isLegacy) { existing.image_url = seedStop.image_url; didPatch = true; }
-      }
-      if (seedStop.reservation_url && !existing.reservation_url) {
-        existing.reservation_url = seedStop.reservation_url; didPatch = true;
-      }
-      // Patch reservation_status only when user hasn't acted on it
-      // (missing or still "none"). Never overwrite "needed" or "booked".
-      if (seedStop.reservation_status &&
-          (!existing.reservation_status || existing.reservation_status === "none") &&
-          existing.reservation_status !== seedStop.reservation_status) {
-        existing.reservation_status = seedStop.reservation_status; didPatch = true;
-      }
-      if (seedStop.unavailable && existing.unavailable === undefined) {
-        existing.unavailable = seedStop.unavailable; didPatch = true;
-      }
-      // Patch slot only if missing (don't trample user-edited slot)
-      if (seedStop.slot && !existing.slot) {
-        existing.slot = seedStop.slot; didPatch = true;
-      }
-      // Patch starred when missing
-      if (seedStop.starred && existing.starred === undefined) {
-        existing.starred = seedStop.starred; didPatch = true;
-      }
-      // Patch notes when missing (good for booking confirmations)
-      if (seedStop.notes && !existing.notes) {
-        existing.notes = seedStop.notes; didPatch = true;
-      }
-      // Patch personal_note (the cute message) when missing
-      if (seedStop.personal_note && !existing.personal_note) {
-        existing.personal_note = seedStop.personal_note; didPatch = true;
-      }
-      // AUTHORITATIVE: if seed marks the stop as booked, force-apply the
-      // full booking package (placement, starred, notes) since reservations
-      // are facts, not opinions.
-      if (seedStop.reservation_status === "booked") {
-        if (existing.reservation_status !== "booked") {
-          existing.reservation_status = "booked"; didPatch = true;
-        }
-        if (existing.day !== seedStop.day) {
-          existing.day = seedStop.day; didPatch = true;
-        }
-        if (seedStop.slot && existing.slot !== seedStop.slot) {
-          existing.slot = seedStop.slot; didPatch = true;
-        }
-        if (seedStop.time && existing.time !== seedStop.time) {
-          existing.time = seedStop.time; didPatch = true;
-        }
-        if (seedStop.order !== undefined && existing.order !== seedStop.order) {
-          existing.order = seedStop.order; didPatch = true;
-        }
-        if (seedStop.starred && !existing.starred) {
-          existing.starred = true; didPatch = true;
-        }
-        if (seedStop.notes && existing.notes !== seedStop.notes) {
-          existing.notes = seedStop.notes; didPatch = true;
-        }
-        if (seedStop.personal_note && existing.personal_note !== seedStop.personal_note) {
-          existing.personal_note = seedStop.personal_note; didPatch = true;
-        }
-      }
-      if (didPatch) patched.push(seedStop.id);
-    }
-  }
-
-  // After force-applying booked placements above, any *other* stop already
-  // occupying the same day+slot gets bumped to the Ideas tray (day 0) so the
-  // booking has its slot. We never bump another booked stop.
-  // ALSO applies when a brand-new seed stop is added with a specific
-  // day+slot (e.g. Casa Corona arriving for Day 4 bar), so its slot
-  // gets cleared even though it isn't "booked".
-  for (const seedStop of seed.stops) {
-    const isBooked = seedStop.reservation_status === "booked";
-    const isNewPlacement = added.includes(seedStop.id) && seedStop.day !== 0 && seedStop.slot;
-    if (!isBooked && !isNewPlacement) continue;
-    const conflicts = next.stops.filter(s =>
-      s.id !== seedStop.id &&
-      s.day === seedStop.day &&
-      s.slot === seedStop.slot &&
-      s.reservation_status !== "booked"
-    );
-    for (const c of conflicts) {
-      c.day = 0;
-      c.order = 100 + Math.floor(Math.random() * 50);
-      if (!patched.includes(c.id)) patched.push(c.id);
-    }
-  }
-
-  // Also: if seed moves an existing stop to day 0 (a "demote to pool"
-  // intentional update — like night4-pineco after Casa Corona arrives),
-  // apply it ONLY when the user's existing copy is still at the previous
-  // seed-canonical position. Heuristic: if existing.day != 0 AND seed.day
-  // == 0 AND existing's current day+slot matches a seed position that no
-  // longer exists, demote. Simpler: just hard-list these by id.
-  const POOL_DEMOTIONS = ["night4-pineco", "schedule-seongsu"];
-  for (const id of POOL_DEMOTIONS) {
-    const seedStop = seed.stops.find(s => s.id === id);
-    const existing = next.stops.find(s => s.id === id);
-    if (!seedStop || !existing) continue;
-    if (seedStop.day === 0 && existing.day !== 0) {
-      // Only demote if user hasn't already moved it somewhere meaningful.
-      // We allow demotion when existing is at a scheduled day with no recent edits.
-      existing.day = 0;
-      existing.slot = seedStop.slot;
-      existing.order = seedStop.order;
-      if (!patched.includes(id)) patched.push(id);
-    }
-  }
-
-  // Seed meta.recipient + meta.trip_note if missing (don't trample user edits)
-  let noteSeeded = false;
-  if (seed.meta) {
-    if (seed.meta.recipient && !next.meta.recipient) { next.meta.recipient = seed.meta.recipient; }
-    if (seed.meta.trip_note && !next.meta.trip_note) {
-      next.meta.trip_note = seed.meta.trip_note;
-      noteSeeded = true;
-    }
-  }
-
-  // Detect Section C layout drift — stops whose seed day/slot/time differs
-  // from saved. If any drift exists, offer "Apply new layout?" in the banner.
-  const layoutDrift = [];
-  for (const seedStop of seed.stops) {
-    const existing = next.stops.find(s => s.id === seedStop.id);
-    if (!existing) continue;
-    if (seedStop.day !== existing.day || (seedStop.slot && seedStop.slot !== existing.slot)
-        || (seedStop.time && seedStop.time !== existing.time)) {
-      layoutDrift.push({
-        id: seedStop.id,
-        seedDay: seedStop.day, seedSlot: seedStop.slot, seedTime: seedStop.time, seedOrder: seedStop.order
-      });
-    }
-  }
-
-  // Add new seed stops that don't exist yet (by id).
+  // 1. Add new seed stops you don't have yet — never modify existing.
   const existingIds = new Set(next.stops.map(s => s.id));
-  const added = [];
-  const addedMichelin = [];
-  const addedByType = {}; // non-michelin counts, keyed by type
   for (const seedStop of seed.stops) {
     if (!existingIds.has(seedStop.id)) {
       next.stops.push(JSON.parse(JSON.stringify(seedStop)));
-      added.push(seedStop.id);
-      if (seedStop.michelin) {
-        addedMichelin.push(seedStop.id);
-      } else {
-        const t = seedStop.type || "other";
-        addedByType[t] = (addedByType[t] || 0) + 1;
-      }
     }
   }
 
-  // Merge any seed days that aren't in saved data (so newly-added scheduled
-  // stops always have a day group to render in).
+  // 2. Add seed days you don't have yet.
   const existingDayNums = new Set(next.days.map(d => d.day));
   for (const seedDay of seed.days) {
     if (!existingDayNums.has(seedDay.day)) {
@@ -272,20 +118,14 @@ function migrateState(saved) {
     }
   }
 
-  next.version = SCHEMA_VERSION;
-
-  if (added.length || patched.length || noteSeeded || layoutDrift.length) {
-    migrationSnapshot = {
-      prev: saved,
-      addedIds: added,
-      addedMichelinIds: addedMichelin,
-      addedByType,
-      patchedIds: patched,
-      noteSeeded,
-      layoutDrift
-    };
+  // 3. Seed meta.recipient + meta.trip_note only when missing.
+  if (seed.meta) {
+    if (seed.meta.recipient && !next.meta.recipient) next.meta.recipient = seed.meta.recipient;
+    if (seed.meta.trip_note && !next.meta.trip_note) next.meta.trip_note = seed.meta.trip_note;
   }
 
+  next.version = SCHEMA_VERSION;
+  migrationSnapshot = null;
   return next;
 }
 
