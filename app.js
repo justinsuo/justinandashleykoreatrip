@@ -897,6 +897,7 @@ function openDetailSheet(id) {
       <button id="btn-star" class="${s.starred ? "primary" : ""}">${s.starred ? "⭐ Starred" : "☆ Star"}</button>
       <button id="btn-done" class="${s.done ? "primary" : ""}">${s.done ? "✅ Visited" : "Mark visited"}</button>
       <button id="btn-edit" class="primary">✏️ Edit</button>
+      <button id="btn-reset-stop" title="Reset this stop's time, day & slot to the original plan">↺ Reset to default</button>
       <button id="btn-delete" class="danger">🗑 Delete</button>
     </div>
   `;
@@ -921,6 +922,19 @@ function openDetailSheet(id) {
     s.done = !s.done; saveState(); renderDayList(); renderTotals(); openDetailSheet(id);
   });
   sheet.querySelector("#btn-edit").addEventListener("click", () => openEditForm(id));
+  sheet.querySelector("#btn-reset-stop").addEventListener("click", () => {
+    const seedStop = (window.SEED_ITINERARY.stops || []).find(x => x.id === s.id);
+    if (!seedStop) { toast("No default for this stop (was added by you)."); return; }
+    if (!confirm(`Reset "${s.name}" to default time, day, and slot?\n\nDay ${seedStop.day} · ${seedStop.time || "(no time)"} · ${seedStop.slot || "(no slot)"}`)) return;
+    s.day = seedStop.day;
+    s.time = seedStop.time || "";
+    s.slot = seedStop.slot;
+    if (seedStop.order !== undefined) s.order = seedStop.order;
+    saveState();
+    renderAll();
+    openDetailSheet(id);
+    toast(`Reset "${s.name}" to default.`);
+  });
   sheet.querySelector("#btn-delete").addEventListener("click", () => {
     if (!confirm(`Delete “${s.name}”?`)) return;
     state.stops = state.stops.filter(x => x.id !== id);
