@@ -1233,6 +1233,8 @@ function switchTab(tab) {
     setupMap();
     rebuildMarkers();
     setTimeout(() => map && map.invalidateSize(), 80);
+  } else if (tab === "calendar") {
+    renderCalendar();
   }
 }
 
@@ -1389,18 +1391,177 @@ function wireUp() {
     setDark(!document.body.classList.contains("dark"));
   });
 
-  document.getElementById("btn-view-toggle").addEventListener("click", () => {
-    const isCal = document.body.classList.toggle("view-calendar");
-    document.getElementById("btn-view-toggle").textContent = isCal ? "📋 List" : "🗓 Calendar";
-    try { localStorage.setItem("seoul-eats-view", isCal ? "calendar" : "list"); } catch (e) {}
-  });
+  document.getElementById("btn-save").addEventListener("click", openSnapshotsModal);
+  document.getElementById("btn-snapshots-close").addEventListener("click", closeSnapshotsModal);
+  document.getElementById("snapshots-backdrop").addEventListener("click", closeSnapshotsModal);
+  document.getElementById("btn-save-snapshot").addEventListener("click", saveCurrentSnapshot);
 
   document.getElementById("tab-stops").addEventListener("click", () => switchTab("stops"));
+  document.getElementById("tab-calendar").addEventListener("click", () => switchTab("calendar"));
   document.getElementById("tab-map").addEventListener("click", () => switchTab("map"));
   document.getElementById("tab-info").addEventListener("click", () => switchTab("info"));
 
   document.getElementById("trip-notes").addEventListener("input", (e) => {
     state.tripNotes = e.target.value; saveState();
+  });
+}
+
+// ----------- Calendar tab -----------
+function renderCalendar() {
+  const root = document.getElementById("calendar-grid");
+  if (!root) return;
+  const scheduledDays = state.days.filter(d => d.day !== 0).sort((a, b) => a.day - b.day);
+  root.innerHTML = "";
+
+  scheduledDays.forEach(d => {
+    const col = document.createElement("section");
+    col.className = "cal-col";
+    col.style.setProperty("--day-color", d.color);
+
+    const stops = stopsForDay(d.day);
+    const subtotal = stops.reduce((s, x) => s + (Number(x.cost_krw) || 0), 0);
+
+    const head = document.createElement("header");
+    head.className = "cal-col-head";
+    head.innerHTML = `
+      <div class="cal-day-num">${d.day}</div>
+      <div class="cal-day-meta">
+        <div class="cal-weekday">${escapeHtml(d.weekday || "")}</div>
+        <div class="cal-date">${escapeHtml(d.date || "")}</div>
+      </div>
+      <div class="cal-day-title">${escapeHtml(d.title)}</div>
+      <div class="cal-day-cost">${subtotal ? fmtKRW(subtotal) : ""}</div>
+    `;
+    col.appendChild(head);
+
+    if (!stops.length) {
+      const empty = document.createElement("div");
+      empty.className = "cal-empty";
+      empty.textContent = "Nothing planned yet.";
+      col.appendChild(empty);
+    }
+    stops.forEach(s => {
+      const row = document.createElement("div");
+      row.className = "cal-row";
+      if (s.done) row.classList.add("done");
+      const emoji = TYPE_EMOJI[s.type] || TYPE_EMOJI.other;
+      const slot = s.slot ? SLOT_LABEL[s.slot] : "";
+      const resStatus = s.reservation_status || "none";
+      const resPill = (resStatus === "needed" || resStatus === "booked")
+        ? `<span class="cal-res cal-res-${resStatus}">${RES_STATUS[resStatus].emoji}</span>` : "";
+      row.innerHTML = `
+        <div class="cal-time">${escapeHtml(s.time || "—")}</div>
+        <div class="cal-card">
+          <div class="cal-card-top">
+            ${slot ? `<span class="cal-slot">${slot}</span>` : ""}
+            ${resPill}
+          </div>
+          <div class="cal-name"><span class="cal-emoji">${emoji}</span> ${escapeHtml(s.name)}</div>
+          <div class="cal-sub">${escapeHtml(s.area || "")}${s.cost_krw ? " · " + fmtKRW(s.cost_krw) : ""}</div>
+        </div>
+      `;
+      row.addEventListener("click", () => {
+        switchTab("stops");
+        setTimeout(() => selectStop(s.id), 100);
+      });
+      col.appendChild(row);
+    });
+
+    root.appendChild(col);
+  });
+}
+
+// ----------- Snapshots (named saved states) -----------
+const SNAPSHOTS_KEY = "seoul-eats-snapshots";
+
+function loadSnapshots() {
+  try {
+    const raw = localStorage.getItem(SNAPSHOTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function persistSnapshots(snaps) {
+  try { localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(snaps)); }
+  catch (e) { toast("Couldn't save snapshot — storage full?"); }
+}
+
+function openSnapshotsModal() {
+  document.getElementById("snapshots-backdrop").classList.remove("hidden");
+  document.getElementById("snapshots-modal").classList.remove("hidden");
+  document.getElementById("snapshot-name").value = "";
+  renderSnapshotsList();
+}
+function closeSnapshotsModal() {
+  document.getElementById("snapshots-backdrop").classList.add("hidden");
+  document.getElementById("snapshots-modal").classList.add("hidden");
+}
+
+function saveCurrentSnapshot() {
+  const input = document.getElementById("snapshot-name");
+  const name = (input.value || "").trim() || `Save · ${new Date().toLocaleString()}`;
+  const snaps = loadSnapshots();
+  snaps.unshift({
+    id: uid("snap"),
+    name,
+    timestamp: Date.now(),
+    stopCount: state.stops.length,
+    data: JSON.parse(JSON.stringify(state))
+  });
+  // Keep at most 20 snapshots so we don't blow up storage
+  if (snaps.length > 20) snaps.length = 20;
+  persistSnapshots(snaps);
+  input.value = "";
+  renderSnapshotsList();
+  toast(`Saved as "${name}"`);
+}
+
+function restoreSnapshot(id) {
+  const snaps = loadSnapshots();
+  const snap = snaps.find(s => s.id === id);
+  if (!snap) return;
+  if (!confirm(`Restore "${snap.name}"? This replaces your current plan (you can save the current one first).`)) return;
+  state = JSON.parse(JSON.stringify(snap.data));
+  saveState();
+  renderAll();
+  closeSnapshotsModal();
+  toast(`Restored "${snap.name}"`);
+}
+
+function deleteSnapshot(id) {
+  const snaps = loadSnapshots().filter(s => s.id !== id);
+  persistSnapshots(snaps);
+  renderSnapshotsList();
+}
+
+function renderSnapshotsList() {
+  const list = document.getElementById("snapshots-list");
+  const snaps = loadSnapshots();
+  if (!snaps.length) {
+    list.innerHTML = `<li class="snapshot-empty">No saved snapshots yet. Save the current plan above.</li>`;
+    return;
+  }
+  list.innerHTML = snaps.map(s => {
+    const when = new Date(s.timestamp).toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+    return `
+      <li class="snapshot-item" data-id="${s.id}">
+        <div class="snap-info">
+          <div class="snap-name">${escapeHtml(s.name)}</div>
+          <div class="snap-meta">${when} · ${s.stopCount} stops</div>
+        </div>
+        <div class="snap-actions">
+          <button class="snap-restore" data-restore="${s.id}">Restore</button>
+          <button class="snap-delete" data-delete="${s.id}" title="Delete snapshot">🗑</button>
+        </div>
+      </li>
+    `;
+  }).join("");
+  list.querySelectorAll("[data-restore]").forEach(b => {
+    b.addEventListener("click", () => restoreSnapshot(b.dataset.restore));
+  });
+  list.querySelectorAll("[data-delete]").forEach(b => {
+    b.addEventListener("click", () => deleteSnapshot(b.dataset.delete));
   });
 }
 
@@ -1411,14 +1572,6 @@ function boot() {
   if (migrationSnapshot) saveState();
   const darkPref = localStorage.getItem(DARK_KEY);
   if (darkPref === "1") setDark(true);
-  const viewPref = localStorage.getItem("seoul-eats-view");
-  if (viewPref === "calendar") {
-    document.body.classList.add("view-calendar");
-    setTimeout(() => {
-      const btn = document.getElementById("btn-view-toggle");
-      if (btn) btn.textContent = "📋 List";
-    }, 0);
-  }
   renderAll();
   wireUp();
   setupSearch();

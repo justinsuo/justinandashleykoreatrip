@@ -397,6 +397,7 @@ window.SEED_ITINERARY = {
     { id: "daechang-euljiro", day: 2, order: 3, time: "19:00", type: "bbq", slot: "dinner",
       name: "Yangmiok (Euljiro Daechang)", name_ko: "양미옥", area: "Euljiro",
       lat: 37.5667845, lng: 126.9911758, cost_krw: 35000, place_id: "ChIJP6tF_v6jfDURtR0Lo_GDfPg",
+      image_url: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEI6_IqdENciMc_KyV15QfiMkk1OKX54xyRi_NVadDc8B0uzlf69py4UUN_Bdvi_YHdQUC3f1ii6QeyZWUdYekqQ78qMXjLXzh3U5rGxCiQrbbkG3xqIai8Ufj_EKmP8TtA84dbR9H1xdnv=w800-h600-k-no",
       reservation_status: "unlikely",
       blurb: "Day 2 dinner — Euljiro daechang (grilled beef intestine) institution; pair with soju + cold noodles. Open daily." },
     { id: "schedule-seongsu", day: 3, order: 2, time: "13:00", type: "other", slot: "lunch",

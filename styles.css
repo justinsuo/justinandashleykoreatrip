@@ -725,6 +725,117 @@ body.dark .for-ashley-card textarea:focus { background: rgba(0,0,0,0.4); }
 
 .hidden { display: none !important; }
 
+/* ----------- Calendar tab ----------- */
+.calendar-toolbar { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.calendar-title { font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; }
+.calendar-hint { font-size: 12px; color: var(--ink-soft); }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 1080px) { .calendar-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
+
+.cal-col {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--day-color, var(--persimmon));
+  border-radius: var(--radius);
+  padding: 12px 12px 14px;
+  box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 220px;
+}
+.cal-col-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.cal-day-num {
+  grid-row: 1 / 3;
+  font-family: 'Instrument Serif', serif; font-size: 38px; font-weight: 400;
+  color: var(--day-color, var(--persimmon)); line-height: 1; align-self: start;
+  letter-spacing: -0.04em;
+}
+.cal-day-meta { display: flex; flex-direction: column; gap: 0; }
+.cal-weekday { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+.cal-date { font-size: 11px; color: var(--ink-faint); }
+.cal-day-title { grid-column: 2 / 4; font-size: 13px; color: var(--ink); font-weight: 500; line-height: 1.3; }
+.cal-day-cost { grid-row: 1; font-size: 12px; font-weight: 600; color: var(--ink-soft); align-self: start; }
+
+.cal-empty { color: var(--ink-faint); font-size: 12px; font-style: italic; padding: 18px 4px; text-align: center; }
+
+.cal-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 6px;
+  align-items: stretch;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  transition: background 0.12s;
+}
+.cal-row:hover { background: var(--card-warm); }
+.cal-row.done .cal-name { text-decoration: line-through; opacity: 0.55; }
+.cal-time {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px; font-weight: 600;
+  color: var(--ink-soft);
+  padding-top: 6px;
+  text-align: right;
+}
+.cal-card { background: var(--paper-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; min-width: 0; }
+.cal-card-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-bottom: 2px; }
+.cal-slot { font-size: 10px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+.cal-res { font-size: 11px; }
+.cal-res-needed { color: var(--persimmon); }
+.cal-res-booked { color: var(--jade); }
+.cal-name { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25; word-wrap: break-word; }
+.cal-emoji { display: inline-block; font-size: 13px; margin-right: 1px; }
+.cal-sub { font-size: 11px; color: var(--ink-soft); margin-top: 2px; word-wrap: break-word; }
+
+@media (max-width: 600px) {
+  .calendar-grid { grid-template-columns: 1fr; }
+  .cal-col { min-height: 0; }
+}
+
+/* ----------- Snapshots modal ----------- */
+.modal-desc { font-size: 13px; color: var(--ink-soft); margin: -6px 0 14px; line-height: 1.5; }
+.snapshot-save-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.snapshot-save-row input {
+  flex: 1; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--card-warm); color: var(--ink); font-size: 14px;
+}
+.snapshot-save-row button { padding: 9px 16px; }
+
+.snapshots-list { list-style: none; padding: 0; margin: 0 0 14px; max-height: 320px; overflow-y: auto; }
+.snapshot-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.snapshot-item:last-child { border-bottom: none; }
+.snap-info { min-width: 0; flex: 1; }
+.snap-name { font-weight: 600; font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.snap-meta { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+.snap-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.snap-actions button {
+  padding: 6px 11px; font-size: 12px; font-weight: 600;
+  border-radius: 999px; border: 1px solid var(--border-strong);
+  background: var(--card-warm); color: var(--ink);
+}
+.snap-restore { background: var(--persimmon) !important; color: white !important; border-color: var(--persimmon) !important; }
+.snap-delete { color: var(--ink-soft); }
+.snap-delete:hover { background: var(--persimmon-soft); color: var(--persimmon); border-color: var(--persimmon); }
+.snapshot-empty { color: var(--ink-faint); font-size: 13px; padding: 16px 8px; text-align: center; font-style: italic; }
+
+#snapshots-modal { width: 480px; max-width: 92vw; }
+#snapshots-modal h2 { font-size: 22px; margin-bottom: 4px; }
+#snapshots-modal > button.ghost { display: block; margin: 8px auto 0; background: transparent; border: 1px solid var(--border); color: var(--ink-soft); padding: 8px 18px; border-radius: 999px; font-weight: 500; }
+
 /* ----------- Calendar view (horizontal columns)
    Triggered by body.view-calendar. Day groups lay out side-by-side. ----------- */
 @media (min-width: 900px) {

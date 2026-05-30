@@ -38,6 +38,7 @@
   <!-- Tabs -->
   <nav class="tabs" role="tablist">
     <button class="tab active" id="tab-stops" role="tab" aria-selected="true">🍽 Itinerary</button>
+    <button class="tab" id="tab-calendar" role="tab" aria-selected="false">📅 Calendar</button>
     <button class="tab" id="tab-map" role="tab" aria-selected="false">🗺️ Map</button>
     <button class="tab" id="tab-info" role="tab" aria-selected="false">ℹ️ Trip info</button>
   </nav>
@@ -54,7 +55,7 @@
     <div class="toolbar">
       <button id="btn-add" class="primary">+ Add place</button>
       <button id="btn-droppin">📍 Drop pin on map</button>
-      <button id="btn-view-toggle" title="Toggle list vs calendar view">🗓 Calendar</button>
+      <button id="btn-save" title="Save a named snapshot of this itinerary">💾 Save</button>
       <button id="btn-export">⬇ Export</button>
       <button id="btn-import">⬆ Import</button>
       <button id="btn-reset" class="ghost">↺ Reset</button>
@@ -86,6 +87,28 @@
       Edits saved to this browser only. Use <strong>Export</strong> to back up or move to another device.
     </footer>
   </main>
+
+  <!-- CALENDAR PANEL -->
+  <section id="panel-calendar" class="panel hidden" role="tabpanel">
+    <div class="calendar-toolbar">
+      <h2 class="calendar-title">Your Seoul calendar</h2>
+      <span class="calendar-hint">5 days, side-by-side. Click any stop to jump to its details.</span>
+    </div>
+    <div id="calendar-grid" class="calendar-grid"></div>
+  </section>
+
+  <!-- SNAPSHOTS MODAL -->
+  <div class="sheet-backdrop hidden" id="snapshots-backdrop"></div>
+  <div class="modal hidden" id="snapshots-modal" role="dialog" aria-modal="true">
+    <h2>💾 Saved snapshots</h2>
+    <p class="modal-desc">Save the current plan with a name so you can come back to this version later.</p>
+    <div class="snapshot-save-row">
+      <input type="text" id="snapshot-name" placeholder="e.g. 'Booking week 1' or 'Ashley's pick'" />
+      <button id="btn-save-snapshot" class="primary">Save now</button>
+    </div>
+    <ul id="snapshots-list" class="snapshots-list"></ul>
+    <button id="btn-snapshots-close" class="ghost">Close</button>
+  </div>
 
   <!-- MAP PANEL -->
   <section id="panel-map" class="panel hidden" role="tabpanel">
