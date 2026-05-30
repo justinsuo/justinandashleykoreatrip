@@ -7,80 +7,72 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; }
 
-/* ----------- Palette ----------- */
+/* ----------- Palette — "Editorial" theme (Linear/Notion-inspired)
+   Cool neutral surface, hairline borders, bold single accent. ----------- */
 :root {
-  /* Hanji light */
-  --paper:        #f6efe0;   /* warm cream base */
-  --paper-soft:   #fbf6e9;
+  --paper:        #f4f4f5;   /* zinc-100, cool neutral (not yellow) */
+  --paper-soft:   #fafafa;
   --card:         #ffffff;
-  --card-warm:    #fdf7e8;
-  --ink:          #1c1815;
-  --ink-soft:     #4a4339;
-  --ink-faint:    #8b8273;
-  --border:       #e3d6bc;
-  --border-strong:#cdbe9f;
+  --card-warm:    #fafafa;
+  --ink:          #09090b;   /* near-black */
+  --ink-soft:     #52525b;   /* zinc-600 */
+  --ink-faint:    #a1a1aa;   /* zinc-400 */
+  --border:       #e4e4e7;   /* zinc-200 */
+  --border-strong:#d4d4d8;   /* zinc-300 */
 
-  --persimmon:    #c1432c;   /* primary accent — Korean traditional red */
-  --persimmon-soft:#fae6df;
-  --jade:         #34746e;   /* secondary — celadon green */
-  --gold:         #b8893b;   /* tertiary — gold leaf, used for stars/michelin */
-  --gold-soft:    #f3e3c2;
-  --indigo:       #2c3e62;
-  --plum:         #6f4a7c;
+  --persimmon:    #dc2626;   /* primary — red-600, bold + food-friendly */
+  --persimmon-soft:#fef2f2;  /* red-50 */
+  --jade:         #16a34a;   /* secondary — green-600 (booked / OK) */
+  --gold:         #ca8a04;   /* tertiary — yellow-600 for Michelin stars */
+  --gold-soft:    #fef9c3;   /* yellow-100 */
+  --indigo:       #4f46e5;
+  --plum:         #9333ea;
 
-  --shadow-sm: 0 2px 6px rgba(60, 38, 12, 0.06);
-  --shadow-md: 0 6px 24px rgba(60, 38, 12, 0.10);
-  --shadow-lg: 0 14px 40px rgba(60, 38, 12, 0.14);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.10);
 
-  --radius:    14px;
-  --radius-sm: 8px;
+  --radius:    10px;          /* tighter, more architectural */
+  --radius-sm: 6px;
 }
 
 body.dark {
-  --paper:        #14110d;
-  --paper-soft:   #1a1612;
-  --card:         #23201b;
-  --card-warm:    #2a261f;
-  --ink:          #f3eee0;
-  --ink-soft:     #c8bfa9;
-  --ink-faint:    #908572;
-  --border:       #34302a;
-  --border-strong:#4a443a;
+  --paper:        #09090b;   /* zinc-950 */
+  --paper-soft:   #18181b;
+  --card:         #18181b;   /* zinc-900 */
+  --card-warm:    #27272a;
+  --ink:          #fafafa;
+  --ink-soft:     #a1a1aa;
+  --ink-faint:    #71717a;
+  --border:       #27272a;
+  --border-strong:#3f3f46;
 
-  --persimmon:    #e96242;
-  --persimmon-soft:#3a1f15;
-  --jade:         #5fa39c;
-  --gold:         #d6a35f;
-  --gold-soft:    #2e2516;
-  --indigo:       #6a87c4;
-  --plum:         #b58ec2;
+  --persimmon:    #f87171;   /* lighter red for dark bg */
+  --persimmon-soft:#7f1d1d;
+  --jade:         #4ade80;
+  --gold:         #facc15;
+  --gold-soft:    #422006;
+  --indigo:       #818cf8;
+  --plum:         #c084fc;
 
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.4);
-  --shadow-md: 0 8px 28px rgba(0,0,0,0.5);
-  --shadow-lg: 0 18px 48px rgba(0,0,0,0.6);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-md: 0 6px 24px rgba(0,0,0,0.55);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,0.65);
 }
 
 /* ----------- Base ----------- */
 body {
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 15px;
+  font-family: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14.5px;
   color: var(--ink);
-  background:
-    radial-gradient(1200px 800px at 10% -10%, rgba(193, 67, 44, 0.05), transparent 60%),
-    radial-gradient(900px 600px at 110% 110%, rgba(52, 116, 110, 0.06), transparent 60%),
-    var(--paper);
+  background: var(--paper);
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
-}
-body.dark {
-  background:
-    radial-gradient(1200px 800px at 10% -10%, rgba(233, 98, 66, 0.08), transparent 60%),
-    radial-gradient(900px 600px at 110% 110%, rgba(95, 163, 156, 0.08), transparent 60%),
-    var(--paper);
+  letter-spacing: -0.005em;
 }
 
-h1, h2, h3, h4 { margin: 0; font-family: 'Fraunces', 'Noto Serif KR', Georgia, serif; font-weight: 500; letter-spacing: -0.012em; }
-.amp { font-style: italic; color: var(--persimmon); font-family: 'Fraunces', serif; font-weight: 400; }
+h1, h2, h3, h4 { margin: 0; font-family: 'Instrument Serif', 'Fraunces', 'Noto Serif KR', Georgia, serif; font-weight: 400; letter-spacing: -0.02em; }
+.amp { font-style: italic; color: var(--persimmon); font-family: 'Instrument Serif', serif; font-weight: 400; }
 
 button { font-family: inherit; cursor: pointer; }
 input, textarea, select { font-family: inherit; font-size: 14px; }
@@ -99,7 +91,7 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
   letter-spacing: -0.015em;
 }
-.subtitle { font-size: 12px; color: var(--ink-soft); margin-top: 4px; font-family: 'Pretendard', sans-serif; }
+.subtitle { font-size: 12px; color: var(--ink-soft); margin-top: 4px; font-family: 'Inter', 'Pretendard', sans-serif; }
 .topbar-right { display: flex; gap: 6px; flex-shrink: 0; }
 
 .iconbtn {
@@ -125,7 +117,7 @@ a:hover { text-decoration: underline; }
   font-size: 14px; font-weight: 500; color: var(--ink-soft);
   position: relative; cursor: pointer;
   border-bottom: 2px solid transparent;
-  font-family: 'Pretendard', sans-serif;
+  font-family: 'Inter', 'Pretendard', sans-serif;
   transition: color 0.15s, border-color 0.15s;
 }
 .tab.active {
@@ -229,7 +221,7 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow-sm);
 }
 .totals .trip-total {
-  font-family: 'Fraunces', serif; font-weight: 600; font-size: 22px; color: var(--persimmon);
+  font-family: 'Instrument Serif', serif; font-weight: 600; font-size: 22px; color: var(--persimmon);
   letter-spacing: -0.015em;
 }
 
@@ -263,22 +255,22 @@ a:hover { text-decoration: underline; }
   width: 44px; height: 44px;
   border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  color: white; font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px;
+  color: white; font-family: 'Instrument Serif', serif; font-weight: 600; font-size: 18px;
   background: var(--day-color, var(--ink-faint));
   flex-shrink: 0;
 }
 .day-head .day-title {
-  font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px;
+  font-family: 'Instrument Serif', serif; font-weight: 600; font-size: 18px;
   line-height: 1.2;
 }
 .day-head .day-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 .day-head .day-cost {
-  font-family: 'Pretendard', monospace; font-weight: 600; font-size: 14px;
+  font-family: 'JetBrains Mono', 'Pretendard', monospace; font-weight: 600; font-size: 14px;
   color: var(--ink-soft); margin-left: auto;
 }
 
 .subsection-head {
-  font-family: 'Fraunces', serif; font-weight: 500; font-size: 14px;
+  font-family: 'Instrument Serif', serif; font-weight: 500; font-size: 14px;
   color: var(--gold); letter-spacing: 0.02em; text-transform: uppercase;
   padding: 14px 4px 8px;
   display: flex; align-items: center; gap: 8px;
@@ -352,7 +344,7 @@ a:hover { text-decoration: underline; }
   font-size: 11px; font-weight: 600; backdrop-filter: blur(4px);
 }
 .card-hero .order-num {
-  font-family: 'Fraunces', serif; font-weight: 600;
+  font-family: 'Instrument Serif', serif; font-weight: 600;
   background: white; color: var(--day-color, var(--ink));
   width: 22px; height: 22px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
@@ -372,9 +364,49 @@ a:hover { text-decoration: underline; }
 .card-hero .res-pill.booked { background: var(--jade); }
 .card-hero .res-pill.needed { background: var(--persimmon); }
 
+.hero-tags-bottom {
+  top: auto; bottom: 8px;
+  position: absolute; left: 8px; right: 8px;
+  display: flex; justify-content: flex-start; align-items: flex-end;
+}
+.slot-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92); color: var(--ink);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.slot-pill.slot-breakfast { color: #b45309; }
+.slot-pill.slot-lunch     { color: #15803d; }
+.slot-pill.slot-dinner    { color: #b91c1c; }
+.slot-pill.slot-bar       { color: #6d28d9; }
+.slot-pill.slot-cafe      { color: #7c2d12; }
+.slot-pill.slot-snack     { color: #9333ea; }
+.slot-pill.slot-sight     { color: #047857; }
+body.dark .slot-pill { background: rgba(0,0,0,0.65); color: var(--ink); border-color: rgba(255,255,255,0.1); }
+body.dark .slot-pill.slot-breakfast { color: #fbbf24; }
+body.dark .slot-pill.slot-lunch     { color: #4ade80; }
+body.dark .slot-pill.slot-dinner    { color: #f87171; }
+body.dark .slot-pill.slot-bar       { color: #c084fc; }
+body.dark .slot-pill.slot-cafe      { color: #fb923c; }
+body.dark .slot-pill.slot-snack     { color: #d8b4fe; }
+body.dark .slot-pill.slot-sight     { color: #6ee7b7; }
+
+/* Missing-slot hint chips at end of a day group */
+.slot-hints {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+}
+.slot-hint {
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--card-warm); color: var(--ink-soft);
+  padding: 6px 12px; font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.slot-hint:hover { border-color: var(--persimmon); color: var(--persimmon); background: var(--persimmon-soft); }
+
 .card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
 .card-name {
-  font-family: 'Fraunces', serif; font-weight: 500; font-size: 16px;
+  font-family: 'Instrument Serif', serif; font-weight: 500; font-size: 16px;
   line-height: 1.2; color: var(--ink);
   display: flex; align-items: center; gap: 6px;
 }
@@ -436,7 +468,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   border-top: 1px solid var(--border);
 }
 .card-actions a, .card-actions button {
-  font-family: 'Pretendard', sans-serif;
+  font-family: 'Inter', 'Pretendard', sans-serif;
   flex: 1; min-width: 0;
   padding: 7px 10px; font-size: 12px; font-weight: 600;
   border-radius: 999px;
@@ -486,7 +518,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
   border: 1px solid var(--pin-color, #888);
   transform: rotate(45deg);
-  font-family: 'Fraunces', serif;
+  font-family: 'Instrument Serif', serif;
 }
 
 /* ----------- Sheet / modal ----------- */
@@ -522,7 +554,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   border-radius: 18px; padding: 22px; max-width: 92vw; width: 440px;
   z-index: 1000; box-shadow: var(--shadow-lg);
 }
-.modal h2 { margin-bottom: 12px; font-size: 22px; font-family: 'Fraunces', serif; }
+.modal h2 { margin-bottom: 12px; font-size: 22px; font-family: 'Instrument Serif', serif; }
 .modal ul { padding-left: 20px; margin: 0 0 16px; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
 .modal button { padding: 10px 18px; border-radius: 999px; border: none; background: var(--persimmon); color: white; font-weight: 600; }
 
@@ -542,7 +574,7 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
 
 .detail-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .detail-name {
-  font-family: 'Fraunces', serif; font-size: 22px; font-weight: 500; line-height: 1.2;
+  font-family: 'Instrument Serif', serif; font-size: 22px; font-weight: 500; line-height: 1.2;
   letter-spacing: -0.01em;
 }
 .detail-name-ko { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
@@ -631,14 +663,49 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
   box-shadow: var(--shadow-md);
 }
 
+/* ----------- "For Ashley" personalised card ----------- */
+.for-ashley-card {
+  background: linear-gradient(135deg, var(--persimmon-soft), var(--gold-soft));
+  border: 1px solid var(--persimmon);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  max-width: 720px;
+  margin: 0 auto 18px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.for-ashley-card h2 {
+  font-family: 'Instrument Serif', serif; font-weight: 500;
+  font-size: 26px; color: var(--persimmon);
+  margin-bottom: 10px; letter-spacing: -0.01em;
+}
+.for-ashley-card textarea {
+  width: 100%; min-height: 110px;
+  background: rgba(255,255,255,0.6);
+  color: var(--ink);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px; font-size: 15px;
+  font-family: 'Inter', 'Pretendard', sans-serif;
+  line-height: 1.55; resize: vertical;
+}
+.for-ashley-card textarea:focus {
+  outline: none; border-color: var(--persimmon); background: white;
+}
+body.dark .for-ashley-card textarea { background: rgba(0,0,0,0.25); }
+body.dark .for-ashley-card textarea:focus { background: rgba(0,0,0,0.4); }
+.for-ashley-card .edit-hint {
+  font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-style: italic;
+}
+
 /* ----------- Info panel ----------- */
 .info-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 22px 24px; max-width: 720px; margin: 0 auto;
   box-shadow: var(--shadow-sm);
 }
-.info-card h2 { font-size: 28px; font-family: 'Fraunces', serif; font-weight: 500; margin-bottom: 12px; }
-.info-card h3 { font-size: 17px; font-family: 'Fraunces', serif; font-weight: 600; margin: 22px 0 8px; color: var(--persimmon); }
+.info-card h2 { font-size: 28px; font-family: 'Instrument Serif', serif; font-weight: 500; margin-bottom: 12px; }
+.info-card h3 { font-size: 17px; font-family: 'Instrument Serif', serif; font-weight: 600; margin: 22px 0 8px; color: var(--persimmon); }
 .info-card p, .info-card ul { font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
 .info-card ul { padding-left: 22px; }
 .info-card li { margin-bottom: 6px; }
@@ -657,3 +724,23 @@ body.dark .time-chip input[type="time"]::-webkit-calendar-picker-indicator { fil
 }
 
 .hidden { display: none !important; }
+
+/* ----------- Calendar view (horizontal columns)
+   Triggered by body.view-calendar. Day groups lay out side-by-side. ----------- */
+@media (min-width: 900px) {
+  body.view-calendar #day-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 1fr);
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 14px;
+    align-items: start;
+  }
+  body.view-calendar .day-group { margin-bottom: 0; min-width: 280px; }
+  body.view-calendar .stop-list {
+    grid-template-columns: 1fr; /* single column inside each day */
+  }
+  body.view-calendar .card-hero { aspect-ratio: 16 / 9; }
+  body.view-calendar #panel-stops { overflow-y: auto; }
+}

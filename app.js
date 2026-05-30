@@ -29,11 +29,26 @@ const IDEAS_TYPE_ORDER = [
   "cafe", "seafood", "dessert", "park", "splurge", "other"
 ];
 
+// Slots — Breakfast → Lunch → Dinner → Bar rhythm
+const SLOT_LABEL = {
+  breakfast: "🍳 Breakfast",
+  lunch:     "🍱 Lunch",
+  dinner:    "🍽 Dinner",
+  bar:       "🍸 Bar",
+  cafe:      "☕ Café",
+  snack:     "🍢 Snack",
+  sight:     "🌳 Sight"
+};
+const SLOT_OPTIONS = Object.keys(SLOT_LABEL);
+const CORE_SLOTS = ["breakfast", "lunch", "dinner", "bar"]; // expected on Days 1–4
+const SLOT_ORDER_RANK = { breakfast: 1, lunch: 2, cafe: 3, sight: 4, snack: 5, dinner: 6, bar: 7 };
+
 // Reservation status meta
 const RES_STATUS = {
-  none:   { emoji: "🪑", label: "No reservation needed", short: "" },
-  needed: { emoji: "⚠️", label: "Reservation needed",   short: "needs booking" },
-  booked: { emoji: "✅", label: "Reservation booked",   short: "booked" }
+  none:     { emoji: "🪑", label: "No reservation needed (market / street food)", short: "" },
+  unlikely: { emoji: "🪑", label: "Reservation not likely needed — walk-in usually fine", short: "walk-in OK" },
+  needed:   { emoji: "⚠️", label: "Reservation needed — book ahead",   short: "needs booking" },
+  booked:   { emoji: "✅", label: "Reservation booked",                short: "booked" }
 };
 const RES_OPTIONS = Object.keys(RES_STATUS);
 
@@ -102,10 +117,46 @@ function migrateState(saved) {
       if (seedStop.reservation_url && !existing.reservation_url) {
         existing.reservation_url = seedStop.reservation_url; didPatch = true;
       }
+      // Patch reservation_status only when user hasn't acted on it
+      // (missing or still "none"). Never overwrite "needed" or "booked".
+      if (seedStop.reservation_status &&
+          (!existing.reservation_status || existing.reservation_status === "none") &&
+          existing.reservation_status !== seedStop.reservation_status) {
+        existing.reservation_status = seedStop.reservation_status; didPatch = true;
+      }
       if (seedStop.unavailable && existing.unavailable === undefined) {
         existing.unavailable = seedStop.unavailable; didPatch = true;
       }
+      // Patch slot only if missing (don't trample user-edited slot)
+      if (seedStop.slot && !existing.slot) {
+        existing.slot = seedStop.slot; didPatch = true;
+      }
       if (didPatch) patched.push(seedStop.id);
+    }
+  }
+
+  // Seed meta.recipient + meta.trip_note if missing (don't trample user edits)
+  let noteSeeded = false;
+  if (seed.meta) {
+    if (seed.meta.recipient && !next.meta.recipient) { next.meta.recipient = seed.meta.recipient; }
+    if (seed.meta.trip_note && !next.meta.trip_note) {
+      next.meta.trip_note = seed.meta.trip_note;
+      noteSeeded = true;
+    }
+  }
+
+  // Detect Section C layout drift — stops whose seed day/slot/time differs
+  // from saved. If any drift exists, offer "Apply new layout?" in the banner.
+  const layoutDrift = [];
+  for (const seedStop of seed.stops) {
+    const existing = next.stops.find(s => s.id === seedStop.id);
+    if (!existing) continue;
+    if (seedStop.day !== existing.day || (seedStop.slot && seedStop.slot !== existing.slot)
+        || (seedStop.time && seedStop.time !== existing.time)) {
+      layoutDrift.push({
+        id: seedStop.id,
+        seedDay: seedStop.day, seedSlot: seedStop.slot, seedTime: seedStop.time, seedOrder: seedStop.order
+      });
     }
   }
 
@@ -138,13 +189,15 @@ function migrateState(saved) {
 
   next.version = SCHEMA_VERSION;
 
-  if (added.length || patched.length) {
+  if (added.length || patched.length || noteSeeded || layoutDrift.length) {
     migrationSnapshot = {
       prev: saved,
       addedIds: added,
       addedMichelinIds: addedMichelin,
       addedByType,
-      patchedIds: patched
+      patchedIds: patched,
+      noteSeeded,
+      layoutDrift
     };
   }
 
@@ -172,7 +225,23 @@ function dayMeta(day) {
   return state.days.find(d => d.day === day) || { color: "#888", title: "Day " + day, date: "", weekday: "" };
 }
 function stopsForDay(day) {
-  return state.stops.filter(s => s.day === day).sort((a, b) => a.order - b.order);
+  const ss = state.stops.filter(s => s.day === day);
+  if (day === 0) {
+    // Ideas tray: keep manual ordering
+    return ss.sort((a, b) => (a.order || 0) - (b.order || 0));
+  }
+  // Scheduled days: sort by time, fall back to slot rhythm, then order
+  return ss.sort((a, b) => {
+    const at = (a.time || "").trim();
+    const bt = (b.time || "").trim();
+    if (at && bt) return at.localeCompare(bt);
+    if (at && !bt) return -1;
+    if (!at && bt) return 1;
+    const ar = SLOT_ORDER_RANK[a.slot] || 99;
+    const br = SLOT_ORDER_RANK[b.slot] || 99;
+    if (ar !== br) return ar - br;
+    return (a.order || 0) - (b.order || 0);
+  });
 }
 function haversineKm(a, b) {
   const R = 6371, toRad = x => x * Math.PI / 180;
@@ -407,6 +476,25 @@ function buildDayGroup(d) {
   }
 
   // Day notes
+  // Missing-slot hints — Days 1–4 only (Day 5 exempt; departure day)
+  if (d.day >= 1 && d.day <= 4) {
+    const haveSlots = new Set(stopsForDay(d.day).map(s => s.slot).filter(Boolean));
+    const missing = CORE_SLOTS.filter(slot => !haveSlots.has(slot));
+    if (missing.length) {
+      const hints = document.createElement("div");
+      hints.className = "slot-hints";
+      hints.innerHTML = missing.map(slot =>
+        `<button class="slot-hint" data-add-slot="${slot}" data-day="${d.day}">➕ Add ${SLOT_LABEL[slot]}</button>`
+      ).join("");
+      hints.addEventListener("click", (e) => {
+        const btn = e.target.closest(".slot-hint");
+        if (!btn) return;
+        addStopForSlot(parseInt(btn.dataset.day, 10), btn.dataset.addSlot);
+      });
+      group.appendChild(hints);
+    }
+  }
+
   const noteVal = (state.dayNotes && state.dayNotes[d.day]) || "";
   const foot = document.createElement("div");
   foot.className = "day-foot";
@@ -419,6 +507,21 @@ function buildDayGroup(d) {
   group.appendChild(foot);
 
   return group;
+}
+
+// Open the Add form pre-filled for a day + slot
+function addStopForSlot(day, slot) {
+  const defaultTimes = { breakfast: "09:00", lunch: "12:30", dinner: "19:00", bar: "22:00" };
+  const defaultTypes = { breakfast: "cafe", lunch: "noodles", dinner: "bbq", bar: "bar" };
+  const draft = {
+    id: uid(), day, order: 999, slot,
+    time: defaultTimes[slot] || "",
+    type: defaultTypes[slot] || "other",
+    name: "", name_ko: "", area: "",
+    lat: state.meta.center[0], lng: state.meta.center[1],
+    cost_krw: 0, blurb: "", reservation_status: "unlikely"
+  };
+  openEditForm(null, { isNew: true, stop: draft });
 }
 
 function buildStopList(d, stops, subkind) {
@@ -445,6 +548,11 @@ function buildStopList(d, stops, subkind) {
       chosenClass: "sortable-chosen",
       filter: ".unavailable",
       preventOnFilter: false,
+      // Auto-scroll the scrollable panel when dragging near its edges
+      scroll: () => document.getElementById("panel-stops") || document.scrollingElement || true,
+      scrollSensitivity: 80,
+      scrollSpeed: 18,
+      bubbleScroll: true,
       onMove: (evt) => !evt.dragged.classList.contains("unavailable"),
       onEnd: handleSortEnd
     });
@@ -500,6 +608,11 @@ function buildStopCard(s, d, idx, stopsInDay) {
     distMeta = `<span class="dot">·</span><span>→ ${km.toFixed(1)} km / ${min} min</span>`;
   }
 
+  const slotLabel = s.slot ? SLOT_LABEL[s.slot] : null;
+  const slotPill = slotLabel
+    ? `<span class="slot-pill slot-${s.slot}">${slotLabel}</span>`
+    : "";
+
   li.innerHTML = `
     <div class="card-hero">
       ${heroImg}
@@ -509,6 +622,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
         </span>
         ${starPill || resPill}
       </div>
+      ${slotPill ? `<div class="hero-tags hero-tags-bottom">${slotPill}</div>` : ""}
     </div>
     <div class="card-body">
       <div class="card-name">
@@ -535,7 +649,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
       ${s.blurb ? `<div class="card-blurb">${escapeHtml(s.blurb)}</div>` : ""}
       <div class="card-actions">
         ${bookBtn}
-        ${s.name_ko ? `<button class="copy-ko-btn" data-no-open="1" title="Copy Korean name to show taxi drivers">📋 Korean</button>` : ""}
+        ${s.name_ko ? `<button class="copy-ko-btn" data-no-open="1" title="Copy Korean name — handy for taxi drivers">📋 Copy Korean</button>` : ""}
         <button class="edit-btn" data-no-open="1" title="Edit" aria-label="Edit">✏️</button>
       </div>
     </div>
@@ -657,9 +771,26 @@ function renderAll() {
   renderDayList();
   renderTotals();
   rebuildMarkers();
+  renderForAshleyCard();
   document.getElementById("title").innerHTML = state.meta.title.replace(/&/g, '<span class="amp">&amp;</span>');
   document.getElementById("subtitle").textContent = state.meta.subtitle;
   document.getElementById("trip-notes").value = state.tripNotes || "";
+}
+
+function renderForAshleyCard() {
+  const el = document.getElementById("for-ashley-card");
+  if (!el) return;
+  const name = state.meta.recipient || "you";
+  const note = state.meta.trip_note || "";
+  el.innerHTML = `
+    <h2>For ${escapeHtml(name)} 💛</h2>
+    <textarea id="ashley-note" placeholder="Write something nice…">${escapeHtml(note)}</textarea>
+    <div class="edit-hint">Tap to edit — saved automatically.</div>
+  `;
+  el.querySelector("#ashley-note").addEventListener("input", (e) => {
+    state.meta.trip_note = e.target.value;
+    saveState();
+  });
 }
 
 // ----------- Select / detail -----------
@@ -795,6 +926,7 @@ function openEditForm(id, options = {}) {
     .join("");
   const typeOpts = TYPE_OPTIONS.map(t => `<option value="${t}" ${t === s.type ? "selected" : ""}>${TYPE_EMOJI[t]} ${t}</option>`).join("");
   const resOpts = RES_OPTIONS.map(k => `<option value="${k}" ${(s.reservation_status || "none") === k ? "selected" : ""}>${RES_STATUS[k].emoji} ${RES_STATUS[k].label}</option>`).join("");
+  const slotOpts = `<option value="">— none —</option>` + SLOT_OPTIONS.map(k => `<option value="${k}" ${s.slot === k ? "selected" : ""}>${SLOT_LABEL[k]}</option>`).join("");
 
   const sheet = document.getElementById("sheet-content");
   sheet.innerHTML = `
@@ -826,6 +958,10 @@ function openEditForm(id, options = {}) {
         <label>Cost (₩)</label>
         <input id="f-cost" type="number" min="0" step="500" value="${s.cost_krw ?? ""}" />
       </div>
+    </div>
+    <div class="form-row">
+      <label>Slot (Breakfast / Lunch / Dinner / Bar …)</label>
+      <select id="f-slot">${slotOpts}</select>
     </div>
     <div class="form-row">
       <label>Area / neighborhood</label>
@@ -896,6 +1032,7 @@ function openEditForm(id, options = {}) {
       type: sheet.querySelector("#f-type").value,
       time: sheet.querySelector("#f-time").value.trim(),
       cost_krw: parseInt(sheet.querySelector("#f-cost").value, 10) || 0,
+      slot: sheet.querySelector("#f-slot").value || undefined,
       area: sheet.querySelector("#f-area").value.trim(),
       image_url: sheet.querySelector("#f-image").value.trim(),
       hours: sheet.querySelector("#f-hours").value.trim(),
@@ -1102,20 +1239,9 @@ function switchTab(tab) {
 // ----------- Migration banner -----------
 function showMigrationBanner() {
   if (!migrationSnapshot) return;
-  const { addedIds, addedMichelinIds, addedByType, patchedIds } = migrationSnapshot;
+  const { addedIds, addedMichelinIds, addedByType, patchedIds, noteSeeded, layoutDrift } = migrationSnapshot;
   const banner = document.getElementById("migration-banner");
   const text = document.getElementById("migration-text");
-
-  // Special case: exactly one new non-Michelin stop — call it by name.
-  if (addedIds.length === 1 && (!addedMichelinIds || addedMichelinIds.length === 0)) {
-    const stop = state.stops.find(s => s.id === addedIds[0]);
-    const name = stop ? stop.name : "a new stop";
-    text.textContent = `✨ Added ${name} to your Ideas tray.`;
-    banner.classList.remove("hidden");
-    document.getElementById("btn-undo-migration").addEventListener("click", undoMigration, { once: true });
-    document.getElementById("btn-dismiss-migration").addEventListener("click", dismissMigration, { once: true });
-    return;
-  }
 
   // Build categorised "added" phrase
   const chunks = [];
@@ -1124,32 +1250,84 @@ function showMigrationBanner() {
   }
   if (addedByType) {
     const labelMap = { streetfood: "street food pick", bar: "night bar", bbq: "BBQ", cafe: "café", noodles: "noodle spot", soup: "soup spot", market: "market", seafood: "seafood", dessert: "dessert", park: "park", splurge: "splurge", other: "stop" };
-    const namedTypes = ["streetfood", "bar"]; // the ones worth calling out by name
+    const namedTypes = ["bar", "streetfood", "cafe", "soup", "noodles"];
     let otherCount = 0;
     namedTypes.forEach(t => {
-      if (addedByType[t]) {
-        const lbl = labelMap[t] || t;
-        chunks.push(`${addedByType[t]} ${lbl}${addedByType[t] === 1 ? "" : "s"}`);
-      }
+      if (addedByType[t]) chunks.push(`${addedByType[t]} ${labelMap[t]}${addedByType[t] === 1 ? "" : "s"}`);
     });
     Object.keys(addedByType).forEach(t => {
       if (!namedTypes.includes(t)) otherCount += addedByType[t];
     });
-    if (otherCount > 0) {
-      chunks.push(`${otherCount} other stop${otherCount === 1 ? "" : "s"}`);
-    }
+    if (otherCount > 0) chunks.push(`${otherCount} other stop${otherCount === 1 ? "" : "s"}`);
+  }
+  if (noteSeeded) chunks.push("a 💛 note");
+
+  // Special case: exactly one new non-Michelin stop and nothing else — call it by name.
+  if (addedIds.length === 1 && (!addedMichelinIds || addedMichelinIds.length === 0) && !noteSeeded && !patchedIds.length && (!layoutDrift || !layoutDrift.length)) {
+    const stop = state.stops.find(s => s.id === addedIds[0]);
+    const name = stop ? stop.name : "a new stop";
+    text.innerHTML = `✨ Added <strong>${escapeHtml(name)}</strong> to your Ideas tray.`;
+    showBannerWithButtons(false);
+    return;
   }
 
   const parts = [];
   if (chunks.length) {
     const joined = chunks.length === 1 ? chunks[0] : chunks.slice(0, -1).join(", ") + " and " + chunks[chunks.length - 1];
-    parts.push("added " + joined + " to your Ideas tray");
+    parts.push("added " + joined);
   }
   if (patchedIds.length) parts.push(`updated ${patchedIds.length} stop${patchedIds.length === 1 ? "" : "s"} with new info`);
+  if (layoutDrift && layoutDrift.length) {
+    parts.push(`a new Breakfast/Lunch/Dinner/Bar layout is available for ${layoutDrift.length} stop${layoutDrift.length === 1 ? "" : "s"}`);
+  }
   text.textContent = "✨ " + parts.join(", and ") + ".";
+  showBannerWithButtons(layoutDrift && layoutDrift.length > 0);
+}
+
+function showBannerWithButtons(showApplyLayout) {
+  const banner = document.getElementById("migration-banner");
   banner.classList.remove("hidden");
-  document.getElementById("btn-undo-migration").addEventListener("click", undoMigration, { once: true });
-  document.getElementById("btn-dismiss-migration").addEventListener("click", dismissMigration, { once: true });
+  // Build buttons fresh each time
+  const undoBtn = document.getElementById("btn-undo-migration");
+  const dismissBtn = document.getElementById("btn-dismiss-migration");
+  undoBtn.replaceWith(undoBtn.cloneNode(true));
+  dismissBtn.replaceWith(dismissBtn.cloneNode(true));
+  document.getElementById("btn-undo-migration").addEventListener("click", undoMigration);
+  document.getElementById("btn-dismiss-migration").addEventListener("click", dismissMigration);
+  // Apply-layout button: inject before the dismiss button if needed
+  const existingApply = document.getElementById("btn-apply-layout");
+  if (existingApply) existingApply.remove();
+  if (showApplyLayout) {
+    const apply = document.createElement("button");
+    apply.id = "btn-apply-layout";
+    apply.textContent = "Apply new layout";
+    apply.style.background = "var(--persimmon)";
+    apply.style.color = "white";
+    apply.style.border = "none";
+    apply.style.padding = "6px 12px";
+    apply.style.borderRadius = "999px";
+    apply.style.fontSize = "12px";
+    apply.style.fontWeight = "600";
+    apply.addEventListener("click", applyLayoutFromSeed);
+    document.getElementById("btn-undo-migration").parentNode.insertBefore(apply, document.getElementById("btn-undo-migration"));
+  }
+}
+
+function applyLayoutFromSeed() {
+  if (!migrationSnapshot || !migrationSnapshot.layoutDrift) return;
+  for (const drift of migrationSnapshot.layoutDrift) {
+    const stop = state.stops.find(s => s.id === drift.id);
+    if (!stop) continue;
+    stop.day = drift.seedDay;
+    if (drift.seedSlot) stop.slot = drift.seedSlot;
+    if (drift.seedTime !== undefined) stop.time = drift.seedTime;
+    if (drift.seedOrder !== undefined) stop.order = drift.seedOrder;
+  }
+  saveState();
+  renderAll();
+  document.getElementById("migration-banner").classList.add("hidden");
+  migrationSnapshot = null;
+  toast("Layout applied.");
 }
 
 function undoMigration() {
@@ -1211,6 +1389,12 @@ function wireUp() {
     setDark(!document.body.classList.contains("dark"));
   });
 
+  document.getElementById("btn-view-toggle").addEventListener("click", () => {
+    const isCal = document.body.classList.toggle("view-calendar");
+    document.getElementById("btn-view-toggle").textContent = isCal ? "📋 List" : "🗓 Calendar";
+    try { localStorage.setItem("seoul-eats-view", isCal ? "calendar" : "list"); } catch (e) {}
+  });
+
   document.getElementById("tab-stops").addEventListener("click", () => switchTab("stops"));
   document.getElementById("tab-map").addEventListener("click", () => switchTab("map"));
   document.getElementById("tab-info").addEventListener("click", () => switchTab("info"));
@@ -1227,6 +1411,14 @@ function boot() {
   if (migrationSnapshot) saveState();
   const darkPref = localStorage.getItem(DARK_KEY);
   if (darkPref === "1") setDark(true);
+  const viewPref = localStorage.getItem("seoul-eats-view");
+  if (viewPref === "calendar") {
+    document.body.classList.add("view-calendar");
+    setTimeout(() => {
+      const btn = document.getElementById("btn-view-toggle");
+      if (btn) btn.textContent = "📋 List";
+    }, 0);
+  }
   renderAll();
   wireUp();
   setupSearch();
