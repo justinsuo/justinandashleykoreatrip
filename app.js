@@ -603,9 +603,7 @@ function renderTotals() {
   const el = document.getElementById("totals");
   el.innerHTML = `
     <div>
-      <div style="font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Scheduled total</div>
-      <div class="trip-total">${fmtKRW(total)}</div>
-      ${needBooking ? `<div style="font-size:12px;color:var(--persimmon);margin-top:4px;">⚠️ ${needBooking} still need${needBooking === 1 ? "s" : ""} booking</div>` : ""}
+      ${needBooking ? `<div style="font-size:12px;color:var(--persimmon);">⚠️ ${needBooking} still need${needBooking === 1 ? "s" : ""} booking</div>` : ""}
       ${booked ? `<div style="font-size:12px;color:var(--jade);margin-top:2px;">✅ ${booked} booked</div>` : ""}
       ${visited ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">🍽 ${visited} visited</div>` : ""}
     </div>
