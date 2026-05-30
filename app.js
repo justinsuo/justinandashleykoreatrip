@@ -131,7 +131,59 @@ function migrateState(saved) {
       if (seedStop.slot && !existing.slot) {
         existing.slot = seedStop.slot; didPatch = true;
       }
+      // Patch starred when missing
+      if (seedStop.starred && existing.starred === undefined) {
+        existing.starred = seedStop.starred; didPatch = true;
+      }
+      // Patch notes when missing (good for booking confirmations)
+      if (seedStop.notes && !existing.notes) {
+        existing.notes = seedStop.notes; didPatch = true;
+      }
+      // AUTHORITATIVE: if seed marks the stop as booked, force-apply the
+      // full booking package (placement, starred, notes) since reservations
+      // are facts, not opinions.
+      if (seedStop.reservation_status === "booked") {
+        if (existing.reservation_status !== "booked") {
+          existing.reservation_status = "booked"; didPatch = true;
+        }
+        if (existing.day !== seedStop.day) {
+          existing.day = seedStop.day; didPatch = true;
+        }
+        if (seedStop.slot && existing.slot !== seedStop.slot) {
+          existing.slot = seedStop.slot; didPatch = true;
+        }
+        if (seedStop.time && existing.time !== seedStop.time) {
+          existing.time = seedStop.time; didPatch = true;
+        }
+        if (seedStop.order !== undefined && existing.order !== seedStop.order) {
+          existing.order = seedStop.order; didPatch = true;
+        }
+        if (seedStop.starred && !existing.starred) {
+          existing.starred = true; didPatch = true;
+        }
+        if (seedStop.notes && existing.notes !== seedStop.notes) {
+          existing.notes = seedStop.notes; didPatch = true;
+        }
+      }
       if (didPatch) patched.push(seedStop.id);
+    }
+  }
+
+  // After force-applying booked placements above, any *other* stop already
+  // occupying the same day+slot gets bumped to the Ideas tray (day 0) so the
+  // booking has its slot. We never bump another booked stop.
+  for (const seedStop of seed.stops) {
+    if (seedStop.reservation_status !== "booked") continue;
+    const conflicts = next.stops.filter(s =>
+      s.id !== seedStop.id &&
+      s.day === seedStop.day &&
+      s.slot === seedStop.slot &&
+      s.reservation_status !== "booked"
+    );
+    for (const c of conflicts) {
+      c.day = 0;
+      c.order = 100 + Math.floor(Math.random() * 50);
+      if (!patched.includes(c.id)) patched.push(c.id);
     }
   }
 
@@ -570,6 +622,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
   if (s.id === selectedStopId) li.classList.add("active");
   if (s.done) li.classList.add("done");
   if (s.unavailable) li.classList.add("unavailable");
+  if (s.starred) li.classList.add("starred");
 
   // Color seeds for gradient fallback (in case image_url fails)
   li.style.setProperty("--card-color", d.color);
@@ -627,7 +680,9 @@ function buildStopCard(s, d, idx, stopsInDay) {
       <div class="card-header">
         ${dayPillHtml}
         ${slotPill}
-        ${starPill || resPill}
+        ${starPill}
+        ${resPill}
+        ${s.starred ? `<span class="fav-pill" title="Starred">⭐</span>` : ""}
       </div>
       <div class="card-name">
         <span style="font-size:18px;">${emoji}</span>
@@ -885,6 +940,7 @@ function openDetailSheet(id) {
     </div>
 
     <div class="detail-actions">
+      <button id="btn-star" class="${s.starred ? "primary" : ""}">${s.starred ? "⭐ Starred" : "☆ Star"}</button>
       <button id="btn-done" class="${s.done ? "primary" : ""}">${s.done ? "✅ Visited" : "Mark visited"}</button>
       <button id="btn-edit" class="primary">✏️ Edit</button>
       <button id="btn-delete" class="danger">🗑 Delete</button>
@@ -902,6 +958,10 @@ function openDetailSheet(id) {
     renderDayList();
     openDetailSheet(id);
     toast("Status: " + RES_STATUS[next].label);
+  });
+  sheet.querySelector("#btn-star").addEventListener("click", () => {
+    s.starred = !s.starred; saveState(); renderDayList(); openDetailSheet(id);
+    toast(s.starred ? `⭐ Starred ${s.name}` : `Unstarred ${s.name}`);
   });
   sheet.querySelector("#btn-done").addEventListener("click", () => {
     s.done = !s.done; saveState(); renderDayList(); renderTotals(); openDetailSheet(id);
@@ -1002,6 +1062,13 @@ function openEditForm(id, options = {}) {
         </select>
       </div>
     </div>
+    <div class="form-row">
+      <label>Starred (favorite)</label>
+      <select id="f-starred">
+        <option value="false" ${!s.starred ? "selected" : ""}>Not starred</option>
+        <option value="true" ${s.starred ? "selected" : ""}>⭐ Starred</option>
+      </select>
+    </div>
     <div class="form-grid2">
       <div class="form-row">
         <label>Latitude</label>
@@ -1044,6 +1111,7 @@ function openEditForm(id, options = {}) {
       reservation_url: sheet.querySelector("#f-res-url").value.trim(),
       michelin: michelin || undefined,
       unavailable: sheet.querySelector("#f-unavailable").value === "true",
+      starred: sheet.querySelector("#f-starred").value === "true",
       lat: parseFloat(sheet.querySelector("#f-lat").value),
       lng: parseFloat(sheet.querySelector("#f-lng").value),
       blurb: sheet.querySelector("#f-blurb").value.trim()

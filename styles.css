@@ -366,6 +366,18 @@ a:hover { text-decoration: underline; }
 .res-pill.booked { background: var(--jade); color: white; border-color: var(--jade); }
 .res-pill.needed { background: var(--persimmon); color: white; border-color: var(--persimmon); }
 
+.fav-pill {
+  display: inline-flex; align-items: center;
+  padding: 3px 7px; border-radius: 999px;
+  background: var(--gold-soft); color: var(--gold);
+  font-size: 12px; line-height: 1;
+  border: 1px solid var(--gold);
+}
+.stop-card.starred {
+  outline: 2px solid var(--gold);
+  outline-offset: -1px;
+}
+
 /* Slot pill — sits inline in the card-header strip (below photo, never on it) */
 .slot-pill {
   display: inline-flex; align-items: center; gap: 4px;
