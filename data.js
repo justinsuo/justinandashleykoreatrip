@@ -159,6 +159,7 @@ window.SEED_ITINERARY = {
       image_url: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAGu_vHep9cYw2PBAsvQD3jquh5zkTcRHzocL07YO5vldzQ5CFI9W_vJB2HLzyy996Avxt1xUJNQWSl9-V8H7XscU2v4ZHwnqxFHlUw1NP-4AzvgkbMJMxG0BVljA0eDXVOLJuEp=w800-h600-k-no",
       reservation_url: "https://www.catchtable.co.kr/en/search?keyword=Jungsik", reservation_status: "booked",
       starred: true,
+      personal_note: "Ashley you're cute 💛",
       notes: "💛 With Ashley · Booked Tue Jun 9, 2026 · 12:30 PM KST · party of 3 · 2F Hall (no phone listed)",
       blurb: "★★ Contemporary Korean — chef Yim Jung-sik's flagship, sister to the NYC outpost. CLOSED Sundays. Sleek, English-friendly. ✅ Booked for Tue Jun 9, 12:30 PM, party of 3, 2F Hall.",
       slot: "lunch" },

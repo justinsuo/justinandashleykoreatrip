@@ -139,6 +139,10 @@ function migrateState(saved) {
       if (seedStop.notes && !existing.notes) {
         existing.notes = seedStop.notes; didPatch = true;
       }
+      // Patch personal_note (the cute message) when missing
+      if (seedStop.personal_note && !existing.personal_note) {
+        existing.personal_note = seedStop.personal_note; didPatch = true;
+      }
       // AUTHORITATIVE: if seed marks the stop as booked, force-apply the
       // full booking package (placement, starred, notes) since reservations
       // are facts, not opinions.
@@ -163,6 +167,9 @@ function migrateState(saved) {
         }
         if (seedStop.notes && existing.notes !== seedStop.notes) {
           existing.notes = seedStop.notes; didPatch = true;
+        }
+        if (seedStop.personal_note && existing.personal_note !== seedStop.personal_note) {
+          existing.personal_note = seedStop.personal_note; didPatch = true;
         }
       }
       if (didPatch) patched.push(seedStop.id);
@@ -684,6 +691,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
         ${resPill}
         ${s.starred ? `<span class="fav-pill" title="Starred">⭐</span>` : ""}
       </div>
+      ${s.personal_note ? `<div class="personal-note">💌 ${escapeHtml(s.personal_note)}</div>` : ""}
       <div class="card-name">
         <span style="font-size:18px;">${emoji}</span>
         <span>${escapeHtml(s.name)}</span>
@@ -1464,6 +1472,7 @@ function wireUp() {
   });
 
   document.getElementById("btn-save").addEventListener("click", openSnapshotsModal);
+  document.getElementById("btn-share").addEventListener("click", copyShareLink);
   document.getElementById("btn-snapshots-close").addEventListener("click", closeSnapshotsModal);
   document.getElementById("snapshots-backdrop").addEventListener("click", closeSnapshotsModal);
   document.getElementById("btn-save-snapshot").addEventListener("click", saveCurrentSnapshot);
@@ -1637,9 +1646,61 @@ function renderSnapshotsList() {
   });
 }
 
+// ----------- Share link (URL-hash encoded state) -----------
+// Encode the full state into the URL hash so anyone who opens the link
+// loads the exact same plan. No backend needed.
+function copyShareLink() {
+  try {
+    const payload = JSON.stringify(state);
+    // UTF-8 safe base64
+    const b64 = btoa(unescape(encodeURIComponent(payload)));
+    const url = location.origin + location.pathname + "#share=" + b64;
+    if (url.length > 8000) {
+      toast("Link is very long — texting it might not work; try Export instead.");
+    }
+    navigator.clipboard.writeText(url).then(
+      () => toast("Share link copied — text it to anyone."),
+      () => {
+        // Fallback: show prompt with the URL
+        prompt("Copy this link:", url);
+      }
+    );
+  } catch (e) {
+    console.error(e);
+    toast("Couldn't build share link.");
+  }
+}
+
+function tryLoadStateFromHash() {
+  const m = (location.hash || "").match(/[#&]share=([A-Za-z0-9+/=_-]+)/);
+  if (!m) return false;
+  try {
+    const b64 = m[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(escape(atob(b64)));
+    const parsed = JSON.parse(json);
+    if (!parsed || !Array.isArray(parsed.stops) || !Array.isArray(parsed.days)) return false;
+    if (!confirm("This link contains a shared itinerary. Load it? (Your current plan will be replaced — Save it first if you want to keep it.)")) {
+      // Clear hash so user isn't re-prompted on every reload
+      history.replaceState(null, "", location.pathname);
+      return false;
+    }
+    state = parsed;
+    saveState();
+    // Clear the hash so a refresh doesn't re-prompt
+    history.replaceState(null, "", location.pathname);
+    return true;
+  } catch (e) {
+    console.warn("Bad share hash:", e);
+    return false;
+  }
+}
+
 // ----------- Boot -----------
 function boot() {
   state = loadState();
+  // If a #share=... hash is present, offer to load that shared state INSTEAD.
+  // This runs after loadState so the user can still see their saved plan if they decline.
+  tryLoadStateFromHash();
   // If we migrated, persist immediately so a reload doesn't re-trigger.
   if (migrationSnapshot) saveState();
   const darkPref = localStorage.getItem(DARK_KEY);
@@ -1647,7 +1708,9 @@ function boot() {
   renderAll();
   wireUp();
   setupSearch();
-  if (migrationSnapshot) showMigrationBanner();
+  // Migration banner removed per request — Apply New Layout prompt
+  // wasn't working well; the Save button covers the same need.
+  // Migration patches still run silently above.
 }
 
 document.addEventListener("DOMContentLoaded", boot);

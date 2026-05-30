@@ -378,6 +378,22 @@ a:hover { text-decoration: underline; }
   outline-offset: -1px;
 }
 
+.personal-note {
+  display: inline-block;
+  margin: 4px 0 2px;
+  padding: 5px 10px;
+  background: linear-gradient(135deg, #fff0f5, #ffe4ec);
+  border: 1px solid #fda4af;
+  border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; color: #be123c;
+  font-family: 'Instrument Serif', serif; font-style: italic;
+  letter-spacing: 0.005em;
+}
+body.dark .personal-note {
+  background: linear-gradient(135deg, #4c0519, #5f0824);
+  border-color: #f43f5e; color: #fda4af;
+}
+
 /* Slot pill — sits inline in the card-header strip (below photo, never on it) */
 .slot-pill {
   display: inline-flex; align-items: center; gap: 4px;
