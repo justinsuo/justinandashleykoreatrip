@@ -8,7 +8,16 @@ window.SEED_ITINERARY = {
     zoom: 12,
     currency: "KRW",
     recipient: "Ashley",
-    trip_note: "For Ashley 💛 — you're cute. This is our Seoul eat-tour: a bar waiting every night and way too many backups to argue over. Move anything around and let's make it ours."
+    trip_note: "For Ashley 💛 — you're cute. This is our Seoul eat-tour: a bar waiting every night and way too many backups to argue over. Move anything around and let's make it ours.",
+    hotel: {
+      name: "Josun Palace, A Luxury Collection Hotel, Seoul Gangnam",
+      short_name: "Josun Palace",
+      name_ko: "조선 팰리스 강남",
+      area: "Gangnam (Teheran-ro)",
+      lat: 37.5028999,
+      lng: 127.0413106,
+      image: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEYdzELOvWtrbXmsqWV4VB_yH9ndTXyDf0M7Ev9aY1cnhRHjHYkfZeEvH778x5e_DjIjb_PZPCNy8z6X9pF9qwW_a8GEI8dLVuYnJ9COi91TTZsn4cp4K4xG8BcGczOrtIydevKtgDajvoK=w800-h600-k-no"
+    }
   },
   days: [
     { day: 1, date: "2026-06-07", weekday: "Sun", title: "Arrival → Hongdae & Yeonnam", color: "#c1432c" },

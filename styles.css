@@ -778,6 +778,82 @@ body.dark .for-ashley-card textarea:focus { background: rgba(0,0,0,0.4); }
 
 .hidden { display: none !important; }
 
+/* ----------- Hotel ----------- */
+/* Hotel map marker: distinct purple-indigo capsule with label */
+.hotel-pin {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: auto;
+}
+.hotel-pin-badge {
+  width: 40px; height: 40px; border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #635bff 0%, #9333ea 100%);
+  border: 3px solid white;
+  box-shadow: 0 4px 12px rgba(99, 91, 255, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.hotel-pin-badge > * { transform: rotate(45deg); }
+.hotel-pin-label {
+  margin-top: 4px;
+  background: #1a1d29; color: white;
+  padding: 3px 9px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Hotel banner at top of itinerary panel */
+.hotel-banner {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(99,91,255,0.06), rgba(0,212,164,0.04));
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--persimmon);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+}
+.hotel-banner:empty { display: none; }
+.hotel-banner-img {
+  width: 96px; height: 72px; border-radius: var(--radius-sm); overflow: hidden;
+  background: linear-gradient(135deg, #635bff, #9333ea);
+  display: flex; align-items: center; justify-content: center;
+}
+.hotel-banner-img img { width: 100%; height: 100%; object-fit: cover; }
+.hotel-banner-emoji { font-size: 36px; color: white; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.hotel-banner-eyebrow { font-size: 11px; font-weight: 700; color: var(--persimmon); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+.hotel-banner-name { font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.hotel-banner-ko { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.hotel-banner-area { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+.hotel-banner-actions button {
+  padding: 8px 12px; border-radius: 999px;
+  background: var(--persimmon); color: white; border: none;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.hotel-banner-actions button:hover { filter: brightness(1.08); }
+@media (max-width: 520px) {
+  .hotel-banner { grid-template-columns: 64px 1fr; }
+  .hotel-banner-img { width: 64px; height: 54px; }
+  .hotel-banner-actions { grid-column: 1 / -1; }
+  .hotel-banner-actions button { width: 100%; }
+}
+
+/* "From hotel" line inside detail sheet */
+.detail-from-hotel {
+  font-size: 13px; color: var(--ink-soft);
+  padding: 8px 12px; margin-bottom: 12px;
+  background: var(--card-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.detail-from-hotel strong { color: var(--ink); font-weight: 700; }
+
 /* ----------- Calendar tab ----------- */
 .calendar-toolbar { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .calendar-title { font-family: 'Inter', sans-serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; }

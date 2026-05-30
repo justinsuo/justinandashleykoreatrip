@@ -177,6 +177,20 @@ function haversineKm(a, b) {
 function walkMin(km) { return Math.round(km * 12); }
 function stars(n) { return "★".repeat(n || 0); }
 
+// Distance + "how to get there" helper from the trip's hotel
+function fromHotel(stop) {
+  const hotel = state.meta && state.meta.hotel;
+  if (!hotel || typeof hotel.lat !== "number") return null;
+  const km = haversineKm({ lat: hotel.lat, lng: hotel.lng }, stop);
+  const walk = walkMin(km);
+  // Rough subway/cab heuristics — under 1.2 km easy walk, 1.2–6 km subway, >6 km cab
+  const mode = km <= 1.2 ? "walk" : km <= 6 ? "subway" : "cab";
+  const modeLabel = mode === "walk" ? `${walk} min walk` :
+                   mode === "subway" ? `~${Math.round(km * 4 + 6)} min subway` :
+                   `~${Math.round(km * 2.5 + 4)} min cab`;
+  return { km, walk, mode, label: `${km.toFixed(1)} km · ${modeLabel}` };
+}
+
 // Pull "CLOSED ..." / "WEEKENDS ONLY" / "OPEN DAILY" hints out of a blurb so the
 // schedule pill on each card warns me before I drag a bar into the wrong night.
 function parseSchedule(blurb) {
@@ -240,6 +254,8 @@ function makePinIcon(color, emoji, orderBadge) {
   });
 }
 
+let hotelMarker = null;
+
 function rebuildMarkers() {
   if (!map) return;
   Object.values(markers).forEach(m => map.removeLayer(m));
@@ -248,6 +264,24 @@ function rebuildMarkers() {
   dayLayers = {};
   Object.values(polylines).forEach(p => map.removeLayer(p));
   polylines = {};
+  if (hotelMarker) { map.removeLayer(hotelMarker); hotelMarker = null; }
+
+  // Hotel marker — pinned, always visible, visually distinct
+  const hotel = state.meta && state.meta.hotel;
+  if (hotel && typeof hotel.lat === "number" && typeof hotel.lng === "number") {
+    const hotelIcon = L.divIcon({
+      className: "",
+      html: `<div class="hotel-pin">
+               <div class="hotel-pin-badge">🏨</div>
+               <div class="hotel-pin-label">${escapeHtml(hotel.short_name || hotel.name || "Hotel")}</div>
+             </div>`,
+      iconSize: [140, 60],
+      iconAnchor: [70, 58]
+    });
+    hotelMarker = L.marker([hotel.lat, hotel.lng], { icon: hotelIcon, zIndexOffset: 1000 })
+      .bindPopup(`<strong>🏨 ${escapeHtml(hotel.name)}</strong><br><small>${escapeHtml(hotel.name_ko || "")}<br>${escapeHtml(hotel.area || "")}</small>`)
+      .addTo(map);
+  }
 
   state.days.forEach(d => {
     dayLayers[d.day] = L.layerGroup();
@@ -529,14 +563,12 @@ function buildStopCard(s, d, idx, stopsInDay) {
                </a>`;
   }
 
-  // Distance to next stop in same day (scheduled only)
-  let distMeta = "";
-  if (d.day !== 0 && stopsInDay[idx + 1]) {
-    const nextStop = stopsInDay[idx + 1];
-    const km = haversineKm(s, nextStop);
-    const min = walkMin(km);
-    distMeta = `<span class="dot">·</span><span>→ ${km.toFixed(1)} km / ${min} min</span>`;
-  }
+  // Distance from the hotel — replaces the old "→ next stop" hop
+  const fh = fromHotel(s);
+  const modeIcon = fh ? (fh.mode === "walk" ? "🚶" : fh.mode === "subway" ? "🚇" : "🚖") : "";
+  const distMeta = fh
+    ? `<span class="dot">·</span><span title="From Josun Palace">🏨 ${modeIcon} ${fh.label}</span>`
+    : "";
 
   const slotLabel = s.slot ? SLOT_LABEL[s.slot] : null;
   const slotPill = slotLabel
@@ -706,9 +738,41 @@ function renderAll() {
   renderTotals();
   rebuildMarkers();
   renderForAshleyCard();
+  renderHotelBanner();
   document.getElementById("title").innerHTML = state.meta.title.replace(/&/g, '<span class="amp">&amp;</span>');
   document.getElementById("subtitle").textContent = state.meta.subtitle;
   document.getElementById("trip-notes").value = state.tripNotes || "";
+}
+
+function renderHotelBanner() {
+  const el = document.getElementById("hotel-banner");
+  if (!el) return;
+  const hotel = state.meta && state.meta.hotel;
+  if (!hotel) { el.innerHTML = ""; return; }
+  const imgSrc = hotel.image || hotel.image_url;
+  el.innerHTML = `
+    <div class="hotel-banner-img">
+      ${imgSrc ? `<img src="${escapeAttr(imgSrc)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" referrerpolicy="no-referrer" /><div class="hotel-banner-emoji" style="display:none;">🏨</div>` : `<div class="hotel-banner-emoji">🏨</div>`}
+    </div>
+    <div class="hotel-banner-body">
+      <div class="hotel-banner-eyebrow">🏨 We're staying at</div>
+      <div class="hotel-banner-name">${escapeHtml(hotel.short_name || hotel.name)}</div>
+      ${hotel.name_ko ? `<div class="hotel-banner-ko">${escapeHtml(hotel.name_ko)}</div>` : ""}
+      <div class="hotel-banner-area">📍 ${escapeHtml(hotel.area || "")}</div>
+    </div>
+    <div class="hotel-banner-actions">
+      <button class="hotel-show-on-map" data-action="map">🗺 Show on map</button>
+    </div>
+  `;
+  el.querySelector('[data-action="map"]').addEventListener("click", () => {
+    switchTab("map");
+    setTimeout(() => {
+      if (hotelMarker) {
+        map.setView([hotel.lat, hotel.lng], 14, { animate: true });
+        hotelMarker.openPopup && hotelMarker.openPopup();
+      }
+    }, 250);
+  });
 }
 
 function renderForAshleyCard() {
@@ -800,6 +864,14 @@ function openDetailSheet(id) {
     </div>
 
     ${resBlock}
+
+    ${(() => {
+      const fh = fromHotel(s);
+      if (!fh) return "";
+      const icon = fh.mode === "walk" ? "🚶" : fh.mode === "subway" ? "🚇" : "🚖";
+      const hotelName = (state.meta.hotel && state.meta.hotel.short_name) || "the hotel";
+      return `<div class="detail-from-hotel">🏨 From ${escapeHtml(hotelName)}: <strong>${icon} ${escapeHtml(fh.label)}</strong></div>`;
+    })()}
 
     ${s.blurb ? `<div class="detail-blurb">${escapeHtml(s.blurb)}</div>` : ""}
 
@@ -1312,6 +1384,17 @@ function wireUp() {
     const visible = state.stops.filter(s => !hiddenDays.has(s.day));
     fitTo(visible.length ? visible : state.stops);
   });
+  const btnFitHotel = document.getElementById("btn-fit-hotel");
+  if (btnFitHotel) {
+    btnFitHotel.addEventListener("click", () => {
+      const hotel = state.meta && state.meta.hotel;
+      if (hotel && typeof hotel.lat === "number") {
+        setupMap();
+        map.setView([hotel.lat, hotel.lng], 14, { animate: true });
+        if (hotelMarker) hotelMarker.openPopup && hotelMarker.openPopup();
+      }
+    });
+  }
   document.getElementById("btn-export").addEventListener("click", exportJson);
   document.getElementById("btn-import").addEventListener("click", () => document.getElementById("import-file").click());
   document.getElementById("import-file").addEventListener("change", (e) => {
@@ -1419,7 +1502,7 @@ function renderCalendar() {
             ${resPill}
           </div>
           <div class="cal-name"><span class="cal-emoji">${emoji}</span> ${escapeHtml(s.name)}</div>
-          <div class="cal-sub">${escapeHtml(s.area || "")}${s.cost_krw ? " · " + fmtKRW(s.cost_krw) : ""}</div>
+          <div class="cal-sub">${escapeHtml(s.area || "")}${s.cost_krw ? " · " + fmtKRW(s.cost_krw) : ""}${(() => { const fh = fromHotel(s); return fh ? ` · 🏨 ${fh.label}` : ""; })()}</div>
         </div>
       `;
       row.addEventListener("click", () => {

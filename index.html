@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="styles.css?v=20260530c" />
+  <link rel="stylesheet" href="styles.css?v=20260530d" />
 </head>
 <body>
   <!-- Top bar -->
@@ -52,6 +52,9 @@
 
   <!-- ITINERARY PANEL (cards) -->
   <main id="panel-stops" class="panel" role="tabpanel">
+    <!-- Hotel anchor card (rendered by app.js) -->
+    <div id="hotel-banner" class="hotel-banner"></div>
+
     <div class="toolbar">
       <button id="btn-add" class="primary">+ Add place</button>
       <button id="btn-droppin">📍 Drop pin on map</button>
@@ -115,6 +118,7 @@
   <section id="panel-map" class="panel hidden" role="tabpanel">
     <div id="map"></div>
     <div class="map-floats">
+      <button id="btn-fit-hotel" class="float-btn">🏨 Center on hotel</button>
       <button id="btn-fit-all" class="float-btn">🔍 Fit all</button>
     </div>
     <div id="droppin-banner" class="droppin-banner hidden">
@@ -190,7 +194,7 @@
     crossorigin=""
   ></script>
 
-  <script src="data.js?v=20260530c"></script>
-  <script src="app.js?v=20260530c"></script>
+  <script src="data.js?v=20260530d"></script>
+  <script src="app.js?v=20260530d"></script>
 </body>
 </html>
