@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#E8590C" />
+  <title>Justin & Ashley · Seoul · Jun 7–11</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 id="title">Justin &amp; Ashley · Seoul</h1>
+      <span id="subtitle" class="subtitle">Jun 7–11 · for Ashley, from Justin</span>
+    </div>
+    <div class="topbar-right">
+      <button id="btn-help" class="iconbtn" title="How to edit">?</button>
+      <button id="btn-darkmode" class="iconbtn" title="Toggle dark mode">🌙</button>
+      <button id="btn-view-toggle" class="iconbtn mobile-only" title="Toggle map/list">📋</button>
+    </div>
+  </header>
+
+  <!-- Korea cheat-sheet -->
+  <div class="cheatsheet">
+    💵 Cash for markets · 🚇 T-money for subway · 🗺️ Naver/Kakao > Google for directions
+  </div>
+
+  <!-- Main split layout -->
+  <main class="layout" id="layout">
+    <!-- Sidebar / list -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <button id="btn-add" class="primary">+ Add place</button>
+        <button id="btn-droppin">📍 Drop pin</button>
+        <button id="btn-fit-all">🔍 Fit all</button>
+      </div>
+      <div class="searchrow hidden" id="searchrow">
+        <input type="text" id="search-input" placeholder="Search a place (Nominatim)…" autocomplete="off" />
+        <button id="btn-search-close" class="iconbtn">✕</button>
+        <ul id="search-results" class="search-results"></ul>
+      </div>
+
+      <!-- Day legend -->
+      <div class="legend" id="legend"></div>
+
+      <!-- Trip notes -->
+      <div class="notes-block">
+        <label for="trip-notes" class="notes-label">📝 Trip notes</label>
+        <textarea id="trip-notes" placeholder="General notes for the whole trip…"></textarea>
+      </div>
+
+      <!-- Day groups will render here -->
+      <div id="day-list"></div>
+
+      <!-- Totals -->
+      <div class="totals" id="totals"></div>
+
+      <!-- Data ops -->
+      <div class="dataops">
+        <button id="btn-export">⬇ Export JSON</button>
+        <button id="btn-import">⬆ Import JSON</button>
+        <button id="btn-reset" class="danger">↺ Reset to default</button>
+        <input type="file" id="import-file" accept="application/json" hidden />
+      </div>
+
+      <footer class="footer-note">
+        Edits saved to this browser (localStorage). Use Export to back up or move to another device.
+      </footer>
+    </aside>
+
+    <!-- Map -->
+    <section class="mapwrap" id="mapwrap">
+      <div id="map"></div>
+      <div id="droppin-banner" class="droppin-banner hidden">
+        Tap the map to drop a new pin. <button id="btn-droppin-cancel">Cancel</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Edit / detail bottom sheet -->
+  <div class="sheet-backdrop hidden" id="sheet-backdrop"></div>
+  <div class="sheet hidden" id="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-grip"></div>
+    <div class="sheet-content" id="sheet-content"></div>
+  </div>
+
+  <!-- Help popover -->
+  <div class="sheet-backdrop hidden" id="help-backdrop"></div>
+  <div class="modal hidden" id="help-modal" role="dialog" aria-modal="true">
+    <h2>How to edit</h2>
+    <ul>
+      <li><strong>Drag a marker</strong> on the map to reposition a stop.</li>
+      <li><strong>Drag a list row</strong> to reorder within a day, or move it to another day's section.</li>
+      <li><strong>Tap a row</strong> (or its ✏️) to edit name, time, day, cost, blurb.</li>
+      <li><strong>+ Add place</strong> searches by name (OpenStreetMap). <strong>📍 Drop pin</strong> lets you tap the map.</li>
+      <li><strong>Export</strong> downloads a JSON backup. <strong>Import</strong> restores one. <strong>Reset</strong> brings back the seed plan.</li>
+      <li>Per-stop buttons open <strong>Naver / Kakao / Google</strong> (Naver+Kakao are best in Korea).</li>
+      <li>Data is saved per browser/device, so <strong>Export</strong> to sync between phone and laptop.</li>
+    </ul>
+    <button id="btn-help-close" class="primary">Got it</button>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- SortableJS for drag-reorder (touch-friendly) -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- Seed itinerary, then app -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
