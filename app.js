@@ -92,7 +92,13 @@ function migrateState(saved) {
     if (existing) {
       let didPatch = false;
       if (seedStop.michelin && !existing.michelin) { existing.michelin = seedStop.michelin; didPatch = true; }
-      if (seedStop.image_url && !existing.image_url) { existing.image_url = seedStop.image_url; didPatch = true; }
+      if (seedStop.image_url) {
+        // Replace if missing OR if it's an old auto-seeded Unsplash URL (legacy
+        // generic stock photos). User-pasted URLs (anything else) stay.
+        const isLegacy = !existing.image_url ||
+          /^https:\/\/images\.unsplash\.com\//.test(existing.image_url);
+        if (isLegacy) { existing.image_url = seedStop.image_url; didPatch = true; }
+      }
       if (seedStop.reservation_url && !existing.reservation_url) {
         existing.reservation_url = seedStop.reservation_url; didPatch = true;
       }
@@ -524,7 +530,7 @@ function buildStopCard(s, d, idx, stopsInDay) {
       ${s.blurb ? `<div class="card-blurb">${escapeHtml(s.blurb)}</div>` : ""}
       <div class="card-actions">
         ${bookBtn}
-        ${s.name_ko ? `<button class="copy-ko-btn" data-no-open="1" title="Copy Korean name">📋 한국어</button>` : ""}
+        ${s.name_ko ? `<button class="copy-ko-btn" data-no-open="1" title="Copy Korean name to show taxi drivers">📋 Korean</button>` : ""}
         <button class="edit-btn" data-no-open="1" title="Edit" aria-label="Edit">✏️</button>
       </div>
     </div>
@@ -705,7 +711,7 @@ function openDetailSheet(id) {
       <a href="${kakaoUrl}" target="_blank" rel="noopener">KakaoMap</a>
       <a href="${googleUrl}" target="_blank" rel="noopener">Google</a>
       <a href="${directionsUrl}" target="_blank" rel="noopener">🚇 Directions</a>
-      <button id="copy-ko">📋 Copy 한국어</button>
+      <button id="copy-ko">📋 Copy Korean name</button>
     </div>
 
     <div class="detail-stop-notes">
@@ -767,7 +773,7 @@ function openEditForm(id, options = {}) {
       <input id="f-name" type="text" value="${escapeAttr(s.name || "")}" />
     </div>
     <div class="form-row">
-      <label>Korean name (한국어)</label>
+      <label>Korean name</label>
       <input id="f-name-ko" type="text" value="${escapeAttr(s.name_ko || "")}" placeholder="for Naver / Kakao / taxi" />
     </div>
     <div class="form-grid2">

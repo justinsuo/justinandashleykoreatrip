@@ -9,7 +9,7 @@ A single-page, fully-editable food-trip map for our 5 days in Seoul. Made for As
 - Interactive Leaflet map with one pin per stop, colored by day.
 - Scrollable list of every day, every meal, with cost subtotals and walking distances.
 - Reservation tracker: each stop has a reservation URL + status (none / needs booking / booked) and the header nags you about anything still unbooked.
-- Korea-friendly quick links: every stop has Naver, Kakao, Google, and a "Copy 한국어" button for taxis.
+- Korea-friendly quick links: every stop has Naver, Kakao, Google, and a "Copy Korean" button for taxis.
 - 100% client-side. No keys, no build step, GitHub Pages-ready.
 
 ## How to edit (from your phone or laptop)
