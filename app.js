@@ -1071,6 +1071,17 @@ function showMigrationBanner() {
   const banner = document.getElementById("migration-banner");
   const text = document.getElementById("migration-text");
 
+  // Special case: exactly one new non-Michelin stop — call it by name.
+  if (addedIds.length === 1 && (!addedMichelinIds || addedMichelinIds.length === 0)) {
+    const stop = state.stops.find(s => s.id === addedIds[0]);
+    const name = stop ? stop.name : "a new stop";
+    text.textContent = `✨ Added ${name} to your Ideas tray.`;
+    banner.classList.remove("hidden");
+    document.getElementById("btn-undo-migration").addEventListener("click", undoMigration, { once: true });
+    document.getElementById("btn-dismiss-migration").addEventListener("click", dismissMigration, { once: true });
+    return;
+  }
+
   // Build categorised "added" phrase
   const chunks = [];
   if (addedMichelinIds && addedMichelinIds.length) {
@@ -1102,19 +1113,23 @@ function showMigrationBanner() {
   if (patchedIds.length) parts.push(`updated ${patchedIds.length} stop${patchedIds.length === 1 ? "" : "s"} with new info`);
   text.textContent = "✨ " + parts.join(", and ") + ".";
   banner.classList.remove("hidden");
-  document.getElementById("btn-undo-migration").addEventListener("click", () => {
-    state = JSON.parse(JSON.stringify(migrationSnapshot.prev));
-    state.version = SCHEMA_VERSION;  // keep version high so migration doesn't re-run
-    migrationSnapshot = null;
-    saveState();
-    renderAll();
-    banner.classList.add("hidden");
-    toast("Undone.");
-  }, { once: true });
-  document.getElementById("btn-dismiss-migration").addEventListener("click", () => {
-    migrationSnapshot = null;
-    banner.classList.add("hidden");
-  }, { once: true });
+  document.getElementById("btn-undo-migration").addEventListener("click", undoMigration, { once: true });
+  document.getElementById("btn-dismiss-migration").addEventListener("click", dismissMigration, { once: true });
+}
+
+function undoMigration() {
+  if (!migrationSnapshot) return;
+  state = JSON.parse(JSON.stringify(migrationSnapshot.prev));
+  state.version = SCHEMA_VERSION;  // keep version high so migration doesn't re-run
+  migrationSnapshot = null;
+  saveState();
+  renderAll();
+  document.getElementById("migration-banner").classList.add("hidden");
+  toast("Undone.");
+}
+function dismissMigration() {
+  migrationSnapshot = null;
+  document.getElementById("migration-banner").classList.add("hidden");
 }
 
 // ----------- Wire up UI -----------

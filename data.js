@@ -232,6 +232,13 @@ window.SEED_ITINERARY = {
       name: "Slow Brew Pub (Neurinmaeul)", name_ko: "느린마을 양조장", area: "Gangnam / Seocho",
       lat: 37.498097, lng: 127.0252657, cost_krw: 30000, place_id: "ChIJHbhgd1mhfDURfkpQ0mGQ6sQ",
       image_url: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800&q=80",
-      blurb: "Makgeolli (rice wine) by the season + jeon pancakes in a modern brewery pub — the traditional-drinking option. Open daily." }
+      blurb: "Makgeolli (rice wine) by the season + jeon pancakes in a modern brewery pub — the traditional-drinking option. Open daily." },
+
+    // ===== 🥩 PREMIUM HANWOO BBQ — day 0 =====
+    { id: "insaeng-hanwoo", day: 0, order: 40, time: "", type: "bbq",
+      name: "Insaeng Hanwoo", name_ko: "인생한우", area: "Majang / Seongdong-gu",
+      lat: 37.57011, lng: 127.0381874, cost_krw: 60000, place_id: "ChIJh5LfCFWjfDURiQ4ty7V9Gqk",
+      image_url: "https://images.unsplash.com/photo-1607081692251-8a6f3a8f3a3a?w=800&q=80",
+      blurb: "Premium Korean beef (hanwoo) — 1++ grade and 14-day wet-aged, at famously fair prices for the quality, near Majang meat market. Pick your cuts (kkotdeungsim/ribeye is the move); it barely needs the grill. Open daily (break ~2–4:30pm). It's in Seongdong-gu, a short hop from Seoul Forest/Seongsu — a great swap for Day 3's dinner if you'd rather not backtrack to Ikseon." }
   ]
 };
