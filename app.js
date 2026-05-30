@@ -118,10 +118,11 @@ function migrateState(saved) {
     }
   }
 
-  // 3. Seed meta.recipient + meta.trip_note only when missing.
+  // 3. Seed meta.recipient + meta.trip_note + meta.hotel only when missing.
   if (seed.meta) {
     if (seed.meta.recipient && !next.meta.recipient) next.meta.recipient = seed.meta.recipient;
     if (seed.meta.trip_note && !next.meta.trip_note) next.meta.trip_note = seed.meta.trip_note;
+    if (seed.meta.hotel && !next.meta.hotel) next.meta.hotel = JSON.parse(JSON.stringify(seed.meta.hotel));
   }
 
   next.version = SCHEMA_VERSION;
